@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PopCue AI Survey Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🤖 PopCue AI Survey Generator</h1>
+            <p>Generate surveys automatically using AI</p>
+        </div>
+
+        <!-- Auth Section -->
+        <div id="authSection" class="auth-section">
+            <h2>Login</h2>
+            <div class="form-group">
+                <label for="authEmail">Email:</label>
+                <input type="email" id="authEmail" placeholder="your@email.com" required>
+            </div>
+            <div class="form-group">
+                <label for="authPassword">Password:</label>
+                <input type="password" id="authPassword" placeholder="Your password" required>
+            </div>
+            <button id="loginBtn" class="btn btn-primary" onclick="login()">Login</button>
+            <p class="auth-hint">Or use your PopCue account credentials</p>
+        </div>
+
+        <!-- Main Panel (hidden until logged in) -->
+        <div id="mainPanel" class="main-panel" style="display: none;">
+            <!-- Logout button -->
+            <div class="logout-section">
+                <button id="logoutBtn" class="btn btn-secondary" onclick="logout()">Logout</button>
+            </div>
+
+            <!-- Survey Form -->
+            <form id="surveyForm" class="survey-form">
+                <h2>Create AI Survey</h2>
+
+                <div class="form-group">
+                    <label for="surveyName">Survey Name *</label>
+                    <input type="text" id="surveyName" placeholder="e.g., Product Launch Feedback" required minlength="5" maxlength="500">
+                    <small id="nameCount" class="char-count">0/500</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="surveyDescription">Description *</label>
+                    <textarea id="surveyDescription" placeholder="e.g., We're testing user reactions to our new design" required minlength="10" maxlength="2000"></textarea>
+                    <small id="descCount" class="char-count">0/2000</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="surveyContext">Context & Requirements * (detailed)</label>
+                    <textarea id="surveyContext" placeholder="e.g., Create 8 questions about design appeal, pricing, purchase intent. Include 5-point rating scales. Target product test for millennial professionals." required minlength="20" maxlength="5000"></textarea>
+                    <small id="contextCount" class="char-count">0/5000</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="surveyPoints">Points Reward</label>
+                        <input type="number" id="surveyPoints" value="50" min="10" max="500">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tenantId">Tenant ID *</label>
+                        <select id="tenantId" required>
+                            <option value="">Select Organization</option>
+                            <!-- Populated from API -->
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large" id="generateBtn">Generate Survey</button>
+            </form>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Generating survey with AI...</p>
+            </div>
+
+            <!-- Response Section -->
+            <div id="responseSection" class="response-section" style="display: none;">
+                <div id="successMessage" class="message success" style="display: none;"></div>
+                <div id="errorMessage" class="message error" style="display: none;"></div>
+
+                <div id="surveyDetails" class="survey-details" style="display: none;">
+                    <h3>Survey Created Successfully! ✅</h3>
+
+                    <div class="detail-item">
+                        <label>Survey ID:</label>
+                        <div class="detail-value">
+                            <span id="surveyIdDisplay"></span>
+                            <button type="button" class="btn-copy" onclick="copySurveyId()">📋 Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Questions Generated:</label>
+                        <span id="questionsCountDisplay">0</span>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Status:</label>
+                        <span class="status-badge">Draft (Manual Review Required)</span>
+                    </div>
+
+                    <div id="warningsSection" style="display: none;" class="warnings">
+                        <h4>⚠️ Validation Warnings:</h4>
+                        <ul id="warningsList"></ul>
+                    </div>
+
+                    <details class="structure-preview">
+                        <summary>📋 View Full Survey Structure</summary>
+                        <pre id="structurePreview"></pre>
+                    </details>
+
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" onclick="resetForm()">Create Another</button>
+                        <button type="button" class="btn btn-primary" onclick="goToDashboard()">Go to Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
