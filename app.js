@@ -94,8 +94,10 @@ function logout() {
     currentUser = null;
 
     // Reset form
-    document.getElementById('surveyForm').reset();
-    document.getElementById('responseSection').style.display = 'none';
+    const surveyForm = document.getElementById('surveyForm');
+    if (surveyForm) surveyForm.reset();
+    const responseSection = document.getElementById('responseSection');
+    if (responseSection) responseSection.style.display = 'none';
 
     // Show auth section
     document.getElementById('authSection').style.display = 'block';
@@ -107,12 +109,15 @@ function logout() {
 }
 
 // ═════════════════════════════════════════════════════════
-// UI MANAGEMENT
+// UI MANAGEMENT - NAVIGATION
 // ═════════════════════════════════════════════════════════
 
 function showMainPanel() {
-    document.getElementById('authSection').style.display = 'none';
-    document.getElementById('mainPanel').style.display = 'block';
+    const authSection = document.getElementById('authSection');
+    const mainPanel = document.getElementById('mainPanel');
+
+    if (authSection) authSection.style.display = 'none';
+    if (mainPanel) mainPanel.style.display = 'block';
 
     // Load tenants
     loadTenants();
@@ -123,10 +128,15 @@ function showMainPanel() {
 
 function showSurveyForm() {
     // Hide surveys list, show survey form
-    document.getElementById('surveyFormSection').style.display = 'block';
-    document.getElementById('surveysListSection').style.display = 'none';
-    document.getElementById('responseSection').style.display = 'none';
-    document.getElementById('surveyForm').style.display = 'block';
+    const surveyFormSection = document.getElementById('surveyFormSection');
+    const surveysListSection = document.getElementById('surveysListSection');
+    const responseSection = document.getElementById('responseSection');
+    const surveyForm = document.getElementById('surveyForm');
+
+    if (surveyFormSection) surveyFormSection.style.display = 'block';
+    if (surveysListSection) surveysListSection.style.display = 'none';
+    if (responseSection) responseSection.style.display = 'none';
+    if (surveyForm) surveyForm.style.display = 'block';
 
     // Scroll to top
     window.scrollTo(0, 0);
@@ -134,8 +144,11 @@ function showSurveyForm() {
 
 function showSurveysList() {
     // Hide survey form, show surveys list
-    document.getElementById('surveyFormSection').style.display = 'none';
-    document.getElementById('surveysListSection').style.display = 'block';
+    const surveyFormSection = document.getElementById('surveyFormSection');
+    const surveysListSection = document.getElementById('surveysListSection');
+
+    if (surveyFormSection) surveyFormSection.style.display = 'none';
+    if (surveysListSection) surveysListSection.style.display = 'block';
 
     // Load surveys from API
     loadSurveysList();
@@ -147,6 +160,11 @@ function showSurveysList() {
 async function loadSurveysList() {
     const tableBody = document.getElementById('surveysTableBody');
     const noCurveysMessage = document.getElementById('noCurveysMessage');
+
+    if (!tableBody) {
+        console.error('surveys table body not found');
+        return;
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/surveys`, {
@@ -165,11 +183,11 @@ async function loadSurveysList() {
 
         if (!surveys || surveys.length === 0) {
             tableBody.innerHTML = '';
-            noCurveysMessage.style.display = 'block';
+            if (noCurveysMessage) noCurveysMessage.style.display = 'block';
             return;
         }
 
-        noCurveysMessage.style.display = 'none';
+        if (noCurveysMessage) noCurveysMessage.style.display = 'none';
 
         // Populate table with surveys
         tableBody.innerHTML = surveys.map(survey => `
