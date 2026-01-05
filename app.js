@@ -317,3 +317,81 @@ function goToDashboard() {
     // Replace with your dashboard URL
     window.location.href = 'https://your-dashboard.com';
 }
+
+// ═════════════════════════════════════════════════════════
+// PUBLISH/UNPUBLISH SURVEY
+// ═════════════════════════════════════════════════════════
+
+async function publishSurvey() {
+    const surveyId = document.getElementById('surveyIdDisplay').textContent;
+
+    if (!surveyId) {
+        showToast('No survey ID found', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to publish survey');
+        }
+
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+
+        // Update UI to show published status
+        document.querySelector('.status-badge').textContent = 'Published (Live)';
+        document.querySelector('.status-badge').style.backgroundColor = '#4CAF50';
+
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Publish error:', error);
+    }
+}
+
+async function unpublishSurvey() {
+    const surveyId = document.getElementById('surveyIdDisplay').textContent;
+
+    if (!surveyId) {
+        showToast('No survey ID found', 'error');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to unpublish this survey? Users won\'t be able to take it anymore.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/unpublish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to unpublish survey');
+        }
+
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+
+        // Update UI to show draft status
+        document.querySelector('.status-badge').textContent = 'Draft (Manual Review Required)';
+        document.querySelector('.status-badge').style.backgroundColor = '#FF9800';
+
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Unpublish error:', error);
+    }
+}
