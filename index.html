@@ -31,12 +31,19 @@
 
         <!-- Main Panel (hidden until logged in) -->
         <div id="mainPanel" class="main-panel" style="display: none;">
-            <!-- Logout button -->
-            <div class="logout-section">
-                <button id="logoutBtn" class="btn btn-secondary" onclick="logout()">Logout</button>
+            <!-- Navigation Bar -->
+            <div class="navbar">
+                <div class="nav-left">
+                    <h2 class="nav-title">Admin Dashboard</h2>
+                </div>
+                <div class="nav-right">
+                    <button id="manageSurveysBtn" class="btn btn-secondary btn-sm" onclick="showSurveysList()">📊 View Surveys</button>
+                    <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+                </div>
             </div>
 
             <!-- Survey Form -->
+            <div id="surveyFormSection" style="display: block;">
             <form id="surveyForm" class="survey-form">
                 <h2>Create AI Survey</h2>
 
@@ -126,7 +133,44 @@
                     </div>
                 </div>
             </div>
+            </div>
+            <!-- Close surveyFormSection div -->
+
+            <!-- Surveys List Section -->
+            <div id="surveysListSection" class="surveys-list-section" style="display: none;">
+                <div class="surveys-header">
+                    <h2>My Surveys</h2>
+                    <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create New Survey</button>
+                </div>
+
+                <div id="surveysList" class="surveys-table-container">
+                    <table class="surveys-table">
+                        <thead>
+                            <tr>
+                                <th>Survey Title</th>
+                                <th>Questions</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="surveysTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
+                                    Loading surveys...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="noCurveysMessage" style="display: none; text-align: center; padding: 40px;">
+                    <p style="color: #999; font-size: 1.1em;">No surveys created yet</p>
+                    <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create Your First Survey</button>
+                </div>
+            </div>
         </div>
+        <!-- Close mainPanel div -->
     </div>
 
     <!-- Toast Notifications -->

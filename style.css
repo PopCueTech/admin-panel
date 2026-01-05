@@ -72,7 +72,113 @@ body {
 
 /* Main Panel */
 .main-panel {
+    padding: 0;
+}
+
+/* Navigation Bar */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 2px solid var(--border-color);
+    background: #f9fafb;
+}
+
+.nav-left {
+    flex: 1;
+}
+
+.nav-title {
+    font-size: 1.5em;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.nav-right {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.btn-sm {
+    padding: 10px 20px;
+    font-size: 0.9em;
+}
+
+/* Survey Form Section */
+.survey-form {
     padding: 30px;
+}
+
+/* Surveys List Section */
+.surveys-list-section {
+    padding: 30px;
+}
+
+.surveys-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.surveys-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.surveys-table-container {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.surveys-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.surveys-table thead {
+    background: #f3f4f6;
+}
+
+.surveys-table th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.surveys-table td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.surveys-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.status-active {
+    display: inline-block;
+    background: #d1fae5;
+    color: #065f46;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.status-draft {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 500;
 }
 
 .logout-section {

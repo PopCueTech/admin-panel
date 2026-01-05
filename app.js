@@ -114,8 +114,123 @@ function showMainPanel() {
     document.getElementById('authSection').style.display = 'none';
     document.getElementById('mainPanel').style.display = 'block';
 
-    // Load tenants (mock data for now)
+    // Load tenants
     loadTenants();
+
+    // Show survey form by default
+    showSurveyForm();
+}
+
+function showSurveyForm() {
+    // Hide surveys list, show survey form
+    document.getElementById('surveyFormSection').style.display = 'block';
+    document.getElementById('surveysListSection').style.display = 'none';
+    document.getElementById('responseSection').style.display = 'none';
+    document.getElementById('surveyForm').style.display = 'block';
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+}
+
+function showSurveysList() {
+    // Hide survey form, show surveys list
+    document.getElementById('surveyFormSection').style.display = 'none';
+    document.getElementById('surveysListSection').style.display = 'block';
+
+    // Load surveys from API
+    loadSurveysList();
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+}
+
+async function loadSurveysList() {
+    const tableBody = document.getElementById('surveysTableBody');
+    const noCurveysMessage = document.getElementById('noCurveysMessage');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load surveys');
+        }
+
+        const surveys = await response.json();
+
+        if (!surveys || surveys.length === 0) {
+            tableBody.innerHTML = '';
+            noCurveysMessage.style.display = 'block';
+            return;
+        }
+
+        noCurveysMessage.style.display = 'none';
+
+        // Populate table with surveys
+        tableBody.innerHTML = surveys.map(survey => `
+            <tr>
+                <td><strong>${survey.title || 'Untitled'}</strong></td>
+                <td>${survey.current_version?.structure?.questions?.length || 0}</td>
+                <td>
+                    <span class="status-${survey.is_active ? 'active' : 'draft'}">
+                        ${survey.is_active ? '✓ Published' : '⏱ Draft'}
+                    </span>
+                </td>
+                <td>${new Date(survey.created_at).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="viewSurvey('${survey.id}')">View</button>
+                    ${!survey.is_active ? `<button class="btn btn-sm btn-success" onclick="publishSurveyDirect('${survey.id}')">Publish</button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+
+        console.log(`✅ Loaded ${surveys.length} survey(s)`);
+    } catch (error) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px; color: #e74c3c;">
+                    ❌ Error loading surveys: ${error.message}
+                </td>
+            </tr>
+        `;
+        console.error('Error loading surveys:', error);
+    }
+}
+
+function viewSurvey(surveyId) {
+    showToast('Survey view feature coming soon', 'info');
+    // TODO: Implement survey details view
+}
+
+async function publishSurveyDirect(surveyId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to publish survey');
+        }
+
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+
+        // Reload surveys list
+        loadSurveysList();
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Publish error:', error);
+    }
 }
 
 async function loadTenants() {
