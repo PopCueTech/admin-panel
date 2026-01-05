@@ -118,13 +118,67 @@ function showMainPanel() {
     loadTenants();
 }
 
-function loadTenants() {
-    // Mock tenants - replace with API call
+async function loadTenants() {
+    const tenantSelect = document.getElementById('tenantId');
+
+    try {
+        // Fetch real tenants from API
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/tenants`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            console.warn('Failed to fetch tenants from API, using fallback');
+            loadMockTenants();
+            return;
+        }
+
+        const data = await response.json();
+        const tenants = data.tenants || data || [];
+
+        if (tenants.length === 0) {
+            console.warn('No tenants found in API response, using fallback');
+            loadMockTenants();
+            return;
+        }
+
+        // Clear existing options
+        tenantSelect.innerHTML = '<option value="">Select Organization</option>';
+
+        // Add real tenants
+        tenants.forEach(tenant => {
+            const option = document.createElement('option');
+            option.value = tenant.id;
+            option.textContent = tenant.name || `Tenant ${tenant.id.substring(0, 8)}`;
+            tenantSelect.appendChild(option);
+        });
+
+        // Set first tenant as default
+        if (tenants.length > 0) {
+            tenantSelect.value = tenants[0].id;
+            localStorage.setItem(TENANT_ID_KEY, tenants[0].id);
+        }
+
+        console.log(`✅ Loaded ${tenants.length} tenants from API`);
+    } catch (error) {
+        console.error('Error loading tenants:', error);
+        loadMockTenants();
+    }
+}
+
+function loadMockTenants() {
+    // Fallback mock tenants if API fails
     const tenantSelect = document.getElementById('tenantId');
     const mockTenants = [
         { id: '00000000-0000-0000-0000-000000000001', name: 'Test Company' },
         { id: '00000000-0000-0000-0000-000000000002', name: 'Another Corp' }
     ];
+
+    console.warn('⚠️ Using mock tenants - API call failed or returned no data');
 
     mockTenants.forEach(tenant => {
         const option = document.createElement('option');
