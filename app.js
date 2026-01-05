@@ -314,8 +314,18 @@ function copySurveyId() {
 }
 
 function goToDashboard() {
-    // Replace with your dashboard URL
-    window.location.href = 'https://your-dashboard.com';
+    // Go back to survey creation form to create more surveys
+    document.getElementById('surveyForm').style.display = 'block';
+    document.getElementById('responseSection').style.display = 'none';
+
+    // Reset form
+    document.getElementById('surveyForm').reset();
+    document.getElementById('nameCount').textContent = '0/500';
+    document.getElementById('descCount').textContent = '0/2000';
+    document.getElementById('contextCount').textContent = '0/5000';
+
+    // Scroll to top
+    window.scrollTo(0, 0);
 }
 
 // ═════════════════════════════════════════════════════════
