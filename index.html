@@ -169,6 +169,104 @@
                     <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create Your First Survey</button>
                 </div>
             </div>
+
+            <!-- Survey Details Section -->
+            <div id="surveyDetailsSection" class="survey-details-section" style="display: none;">
+                <div class="details-header">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="backToSurveysList()">← Back to Surveys</button>
+                    <h2 id="detailsTitle">Survey Details</h2>
+                </div>
+
+                <div class="details-content">
+                    <!-- Survey Metadata Card -->
+                    <div class="details-card">
+                        <div class="card-header">
+                            <h3 id="surveyTitleDetail">Survey Title</h3>
+                            <span id="surveyStatusBadge" class="status-badge"></span>
+                        </div>
+
+                        <div class="detail-row">
+                            <label>Description:</label>
+                            <p id="surveyDescriptionDetail">Loading...</p>
+                        </div>
+
+                        <div class="detail-row-grid">
+                            <div class="detail-item">
+                                <label>Survey ID:</label>
+                                <div class="detail-value">
+                                    <span id="surveyIdDetail"></span>
+                                    <button type="button" class="btn-copy" onclick="copySurveyIdDetail()">📋 Copy</button>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <label>Points Reward:</label>
+                                <span id="surveyPointsDetail">0</span>
+                            </div>
+
+                            <div class="detail-item">
+                                <label>Created:</label>
+                                <span id="surveyCreatedDetail">N/A</span>
+                            </div>
+
+                            <div class="detail-item">
+                                <label>Questions:</label>
+                                <span id="surveyQuestionsDetail">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Questions Preview Card -->
+                    <div class="details-card">
+                        <h3>Questions Preview</h3>
+                        <details class="questions-preview">
+                            <summary>📋 View All Questions</summary>
+                            <div id="questionsListDetail" class="questions-list">
+                                <p>Loading questions...</p>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- Actions Card -->
+                    <div class="details-card actions-card">
+                        <h3>Actions</h3>
+                        <div class="button-group">
+                            <button
+                                id="downloadReportBtn"
+                                type="button"
+                                class="btn btn-primary"
+                                onclick="downloadSurveyReport()"
+                                style="display: none;">
+                                📊 Download Report (PDF)
+                            </button>
+                            <button
+                                id="publishDetailBtn"
+                                type="button"
+                                class="btn btn-success"
+                                onclick="publishSurveyFromDetail()"
+                                style="display: none;">
+                                📢 Publish Survey
+                            </button>
+                            <button
+                                id="unpublishDetailBtn"
+                                type="button"
+                                class="btn btn-warning"
+                                onclick="unpublishSurveyFromDetail()"
+                                style="display: none;">
+                                🔇 Unpublish Survey
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading Spinner for Report Download -->
+                <div id="reportLoadingSpinner" class="report-loading-overlay" style="display: none;">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <p>Generating PDF report... This may take a few seconds.</p>
+                    </div>
+                </div>
+            </div>
         </div>
         <!-- Close mainPanel div -->
     </div>

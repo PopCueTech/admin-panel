@@ -2,13 +2,14 @@
 // CONFIGURATION
 // ═════════════════════════════════════════════════════════
 
-const API_BASE_URL = 'https://popcue-api-812411253957.us-central1.run.app';
+const API_BASE_URL = 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app';
 const TOKEN_KEY = 'popcue_admin_token';
 const USER_KEY = 'popcue_admin_user';
 const TENANT_ID_KEY = 'popcue_admin_tenant_id';
 
 let currentUser = null;
 let currentToken = null;
+let currentSurveyData = null;
 
 // ═════════════════════════════════════════════════════════
 // INITIALIZATION
@@ -220,9 +221,30 @@ async function loadSurveysList() {
     }
 }
 
-function viewSurvey(surveyId) {
-    showToast('Survey view feature coming soon', 'info');
-    // TODO: Implement survey details view
+async function viewSurvey(surveyId) {
+    try {
+        // Fetch survey details
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load survey details');
+        }
+
+        const surveyData = await response.json();
+        currentSurveyData = surveyData;
+
+        // Navigate to details view
+        showSurveyDetails(surveyData);
+    } catch (error) {
+        showToast(`Error loading survey: ${error.message}`, 'error');
+        console.error('Error:', error);
+    }
 }
 
 async function publishSurveyDirect(surveyId) {
@@ -533,6 +555,221 @@ async function unpublishSurvey() {
         document.querySelector('.status-badge').textContent = 'Draft (Manual Review Required)';
         document.querySelector('.status-badge').style.backgroundColor = '#FF9800';
 
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Unpublish error:', error);
+    }
+}
+
+// ═════════════════════════════════════════════════════════
+// SURVEY DETAILS VIEW
+// ═════════════════════════════════════════════════════════
+
+function showSurveyDetails(survey) {
+    // Hide other sections
+    document.getElementById('surveyFormSection').style.display = 'none';
+    document.getElementById('surveysListSection').style.display = 'none';
+    document.getElementById('surveyDetailsSection').style.display = 'block';
+
+    // Populate survey metadata
+    document.getElementById('surveyTitleDetail').textContent = survey.title;
+    document.getElementById('surveyDescriptionDetail').textContent = survey.description || 'No description';
+    document.getElementById('surveyIdDetail').textContent = survey.id;
+    document.getElementById('surveyPointsDetail').textContent = survey.points || 0;
+    document.getElementById('surveyCreatedDetail').textContent = new Date(survey.created_at).toLocaleDateString();
+
+    // Set status badge
+    const statusBadge = document.getElementById('surveyStatusBadge');
+    if (survey.is_active) {
+        statusBadge.textContent = '✓ Published';
+        statusBadge.className = 'status-badge status-active';
+    } else {
+        statusBadge.textContent = '⏱ Draft';
+        statusBadge.className = 'status-badge status-draft';
+    }
+
+    // Display questions
+    const questionsList = document.getElementById('questionsListDetail');
+    if (survey.current_version && survey.current_version.structure && survey.current_version.structure.questions) {
+        const questions = survey.current_version.structure.questions;
+        document.getElementById('surveyQuestionsDetail').textContent = questions.length;
+
+        questionsList.innerHTML = questions.map((q, idx) => `
+            <div class="question-item">
+                <strong>Q${idx + 1}:</strong> ${q.label || q.text || 'Untitled Question'}
+                <span class="question-type">(${q.type})</span>
+            </div>
+        `).join('');
+    } else {
+        document.getElementById('surveyQuestionsDetail').textContent = '0';
+        questionsList.innerHTML = '<p>No questions available</p>';
+    }
+
+    // Show/hide action buttons based on status
+    updateActionButtons(survey);
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+}
+
+function updateActionButtons(survey) {
+    const downloadBtn = document.getElementById('downloadReportBtn');
+    const publishBtn = document.getElementById('publishDetailBtn');
+    const unpublishBtn = document.getElementById('unpublishDetailBtn');
+
+    // Only show download button for published surveys
+    if (survey.is_active) {
+        downloadBtn.style.display = 'inline-block';
+        publishBtn.style.display = 'none';
+        unpublishBtn.style.display = 'inline-block';
+    } else {
+        downloadBtn.style.display = 'none';
+        publishBtn.style.display = 'inline-block';
+        unpublishBtn.style.display = 'none';
+    }
+}
+
+function backToSurveysList() {
+    currentSurveyData = null;
+    showSurveysList();
+}
+
+function copySurveyIdDetail() {
+    const surveyId = document.getElementById('surveyIdDetail').textContent;
+    navigator.clipboard.writeText(surveyId).then(() => {
+        showToast('Survey ID copied to clipboard!', 'success');
+    }).catch(() => {
+        showToast('Failed to copy', 'error');
+    });
+}
+
+// ═════════════════════════════════════════════════════════
+// REPORT GENERATION
+// ═════════════════════════════════════════════════════════
+
+async function downloadSurveyReport() {
+    if (!currentSurveyData) {
+        showToast('No survey data available', 'error');
+        return;
+    }
+
+    const surveyId = currentSurveyData.id;
+    const downloadBtn = document.getElementById('downloadReportBtn');
+    const loadingSpinner = document.getElementById('reportLoadingSpinner');
+
+    try {
+        // Disable button and show loading state
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = '⏳ Generating Report...';
+        loadingSpinner.style.display = 'flex';
+
+        // Make API call to get PDF
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/report/pdf`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        // Handle error responses
+        if (!response.ok) {
+            const contentType = response.headers.get('content-type');
+
+            // Parse error message
+            let errorMessage = 'Failed to generate report';
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorMessage;
+                } catch (e) {
+                    // If JSON parsing fails, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+            }
+
+            // Specific error handling
+            if (response.status === 400) {
+                throw new Error('Invalid survey ID format');
+            } else if (response.status === 404) {
+                if (errorMessage.includes('No responses') || errorMessage.includes('no responses')) {
+                    throw new Error('No responses available yet. Reports can only be generated for surveys with at least one response.');
+                } else {
+                    throw new Error('Survey not found');
+                }
+            } else {
+                throw new Error(errorMessage);
+            }
+        }
+
+        // Convert response to blob
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `survey_${surveyId}_report.pdf`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        // Show success message
+        showToast('✅ Report downloaded successfully!', 'success');
+
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Report download error:', error);
+    } finally {
+        // Reset button state
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = '📊 Download Report (PDF)';
+        loadingSpinner.style.display = 'none';
+    }
+}
+
+// ═════════════════════════════════════════════════════════
+// SURVEY ACTIONS FROM DETAILS
+// ═════════════════════════════════════════════════════════
+
+async function publishSurveyFromDetail() {
+    if (!currentSurveyData) return;
+
+    await publishSurveyDirect(currentSurveyData.id);
+
+    // Refresh the view with updated data
+    await viewSurvey(currentSurveyData.id);
+}
+
+async function unpublishSurveyFromDetail() {
+    if (!currentSurveyData) return;
+
+    // Confirmation dialog
+    if (!confirm('Are you sure you want to unpublish this survey? Users won\'t be able to take it anymore.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${currentSurveyData.id}/unpublish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to unpublish survey');
+        }
+
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+
+        // Refresh the view
+        await viewSurvey(currentSurveyData.id);
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
         console.error('Unpublish error:', error);
