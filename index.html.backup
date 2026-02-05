@@ -34,100 +34,16 @@
             <!-- Navigation Bar -->
             <div class="navbar">
                 <div class="nav-left">
-                    <button class="nav-tab active" onclick="showDashboard()">📊 Dashboard</button>
-                    <button class="nav-tab" onclick="showSurveyForm()">➕ Create Survey</button>
-                    <button class="nav-tab" onclick="showSurveysList()">📋 View Surveys</button>
+                    <h2 class="nav-title">Admin Dashboard</h2>
                 </div>
                 <div class="nav-right">
+                    <button id="manageSurveysBtn" class="btn btn-secondary btn-sm" onclick="showSurveysList()">📊 View Surveys</button>
                     <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
                 </div>
             </div>
 
-            <!-- Dashboard Section -->
-            <div id="dashboardSection" class="dashboard-section" style="display: none;">
-                <div class="dashboard-header">
-                    <h2>Admin Dashboard</h2>
-                    <div class="dashboard-controls">
-                        <select id="timeFilter" onchange="loadDashboard()">
-                            <option value="24h">Last 24 Hours</option>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="all" selected>All Time</option>
-                        </select>
-                        <button class="btn btn-primary btn-sm" onclick="refreshDashboard()">🔄 Refresh</button>
-                    </div>
-                </div>
-
-                <div class="stats-grid">
-                    <!-- User Stats -->
-                    <div class="stat-card">
-                        <h3>Users</h3>
-                        <div class="stat-value" id="totalUsers">-</div>
-                        <div class="stat-label">Total Users</div>
-                        <div class="stat-sub">
-                            <span><strong id="activeUsers">-</strong> Active</span>
-                            <span><strong id="newSignups">-</strong> New Signups</span>
-                        </div>
-                        <div class="stat-growth" id="userGrowth">-</div>
-                    </div>
-
-                    <!-- Survey Stats -->
-                    <div class="stat-card">
-                        <h3>Surveys</h3>
-                        <div class="stat-value" id="completedSurveys">-</div>
-                        <div class="stat-label">Completed</div>
-                        <div class="stat-sub">
-                            <span><strong id="totalSurveys">-</strong> Total</span>
-                            <span><strong id="publishedSurveys">-</strong> Published</span>
-                        </div>
-                        <div class="stat-metric">Completion: <strong id="completionRate">-</strong></div>
-                    </div>
-
-                    <!-- Reward Stats -->
-                    <div class="stat-card">
-                        <h3>Rewards</h3>
-                        <div class="stat-value" id="pointsCirculation">-</div>
-                        <div class="stat-label">Points in Circulation</div>
-                        <div class="stat-sub">
-                            <span><strong id="totalEarned">-</strong> Earned</span>
-                            <span><strong id="totalRedeemed">-</strong> Redeemed</span>
-                        </div>
-                        <div class="stat-metric">Redemption: <strong id="redemptionRate">-</strong></div>
-                    </div>
-
-                    <!-- Voucher Stats -->
-                    <div class="stat-card">
-                        <h3>Vouchers</h3>
-                        <div class="stat-value" id="voucherCount">-</div>
-                        <div class="stat-label">Redemptions</div>
-                        <div class="stat-sub">
-                            <span>Total Value: <strong id="voucherValue">-</strong></span>
-                        </div>
-                        <div class="top-brands">
-                            <strong>Top Brands:</strong>
-                            <ul id="topBrands"></ul>
-                        </div>
-                    </div>
-
-                    <!-- Referral Stats -->
-                    <div class="stat-card">
-                        <h3>Referrals</h3>
-                        <div class="stat-value" id="referralSignups">-</div>
-                        <div class="stat-label">Total Signups</div>
-                        <div class="stat-sub">
-                            <span><strong id="newReferrals">-</strong> New</span>
-                        </div>
-                        <div class="stat-metric">Conversion: <strong id="referralConversion">-</strong></div>
-                    </div>
-                </div>
-
-                <div class="cache-info" id="cacheInfo">
-                    <small>Cached: <span id="cacheAge">-</span> | Expires in: <span id="cacheExpires">-</span></small>
-                </div>
-            </div>
-
             <!-- Survey Form -->
-            <div id="surveyFormSection" style="display: none;">
+            <div id="surveyFormSection" style="display: block;">
             <form id="surveyForm" class="survey-form">
                 <h2>Create AI Survey</h2>
 

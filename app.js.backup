@@ -123,164 +123,39 @@ function showMainPanel() {
     // Load tenants
     loadTenants();
 
-    // Show dashboard by default
-    showDashboard();
+    // Show survey form by default
+    showSurveyForm();
 }
 
 function showSurveyForm() {
-    // Hide all sections except survey form
-    hideAllSections();
+    // Hide surveys list, show survey form
     const surveyFormSection = document.getElementById('surveyFormSection');
+    const surveysListSection = document.getElementById('surveysListSection');
     const responseSection = document.getElementById('responseSection');
     const surveyForm = document.getElementById('surveyForm');
 
     if (surveyFormSection) surveyFormSection.style.display = 'block';
+    if (surveysListSection) surveysListSection.style.display = 'none';
     if (responseSection) responseSection.style.display = 'none';
     if (surveyForm) surveyForm.style.display = 'block';
-
-    setActiveTab('create');
 
     // Scroll to top
     window.scrollTo(0, 0);
 }
 
 function showSurveysList() {
-    // Hide all sections except surveys list
-    hideAllSections();
+    // Hide survey form, show surveys list
+    const surveyFormSection = document.getElementById('surveyFormSection');
     const surveysListSection = document.getElementById('surveysListSection');
 
+    if (surveyFormSection) surveyFormSection.style.display = 'none';
     if (surveysListSection) surveysListSection.style.display = 'block';
-
-    setActiveTab('list');
 
     // Load surveys from API
     loadSurveysList();
 
     // Scroll to top
     window.scrollTo(0, 0);
-}
-
-// ═════════════════════════════════════════════════════════
-// DASHBOARD
-// ═════════════════════════════════════════════════════════
-
-async function showDashboard() {
-    hideAllSections();
-    document.getElementById('dashboardSection').style.display = 'block';
-    setActiveTab('dashboard');
-    await loadDashboard();
-}
-
-async function loadDashboard() {
-    const timeFilter = document.getElementById('timeFilter').value;
-
-    try {
-        const response = await fetch(
-            `${API_BASE_URL}/api/v1/admin/stats?time_filter=${timeFilter}`,
-            {
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            }
-        );
-
-        if (response.status === 403) {
-            showToast('Admin access required', 'error');
-            logout();
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        displayDashboard(data);
-
-    } catch (error) {
-        console.error('Dashboard error:', error);
-        showToast(`Failed to load dashboard: ${error.message}`, 'error');
-    }
-}
-
-function displayDashboard(data) {
-    // User metrics
-    document.getElementById('totalUsers').textContent = data.users.total.toLocaleString();
-    document.getElementById('activeUsers').textContent = data.users.active.toLocaleString();
-    document.getElementById('newSignups').textContent = data.users.new_signups.toLocaleString();
-    document.getElementById('userGrowth').textContent = `${data.users.growth_rate >= 0 ? '+' : ''}${data.users.growth_rate.toFixed(1)}%`;
-
-    // Survey metrics
-    document.getElementById('totalSurveys').textContent = data.surveys.total;
-    document.getElementById('publishedSurveys').textContent = data.surveys.published;
-    document.getElementById('completedSurveys').textContent = data.surveys.completed.toLocaleString();
-    document.getElementById('completionRate').textContent = `${data.surveys.completion_rate.toFixed(1)}%`;
-
-    // Reward metrics
-    document.getElementById('pointsCirculation').textContent = data.rewards.points_in_circulation.toLocaleString();
-    document.getElementById('totalEarned').textContent = data.rewards.total_earned.toLocaleString();
-    document.getElementById('totalRedeemed').textContent = data.rewards.total_redeemed.toLocaleString();
-    document.getElementById('redemptionRate').textContent = `${data.rewards.redemption_rate.toFixed(1)}%`;
-
-    // Voucher metrics
-    document.getElementById('voucherCount').textContent = data.vouchers.redemptions_count.toLocaleString();
-    document.getElementById('voucherValue').textContent = `$${data.vouchers.redemptions_value_usd.toFixed(2)}`;
-
-    const brandsHTML = data.vouchers.top_brands.map(b =>
-        `<li>${b.brand}: ${b.redemption_count} ($${b.total_value_usd.toFixed(2)})</li>`
-    ).join('');
-    document.getElementById('topBrands').innerHTML = brandsHTML || '<li>No data</li>';
-
-    // Referral metrics
-    document.getElementById('referralSignups').textContent = data.referrals.total_signups.toLocaleString();
-    document.getElementById('newReferrals').textContent = data.referrals.new_signups.toLocaleString();
-    document.getElementById('referralConversion').textContent = `${data.referrals.conversion_rate.toFixed(1)}%`;
-
-    // Cache info
-    if (data.cache_info) {
-        document.getElementById('cacheAge').textContent = `${data.cache_info.age_minutes.toFixed(1)} min ago`;
-        document.getElementById('cacheExpires').textContent = `${data.cache_info.expires_in_minutes.toFixed(1)} min`;
-    }
-}
-
-async function refreshDashboard() {
-    const timeFilter = document.getElementById('timeFilter').value;
-
-    try {
-        showToast('Refreshing stats...', 'info');
-
-        const response = await fetch(
-            `${API_BASE_URL}/api/v1/admin/stats/refresh?time_filter=${timeFilter}`,
-            {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        displayDashboard(data);
-        showToast('✅ Stats refreshed!', 'success');
-
-    } catch (error) {
-        console.error('Refresh error:', error);
-        showToast(`Refresh failed: ${error.message}`, 'error');
-    }
-}
-
-function hideAllSections() {
-    document.getElementById('dashboardSection').style.display = 'none';
-    document.getElementById('surveyFormSection').style.display = 'none';
-    document.getElementById('surveysListSection').style.display = 'none';
-    document.getElementById('surveyDetailsSection').style.display = 'none';
-}
-
-function setActiveTab(tab) {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    if (tab === 'dashboard') document.querySelectorAll('.nav-tab')[0].classList.add('active');
-    if (tab === 'create') document.querySelectorAll('.nav-tab')[1].classList.add('active');
-    if (tab === 'list') document.querySelectorAll('.nav-tab')[2].classList.add('active');
 }
 
 async function loadSurveysList() {
@@ -691,8 +566,9 @@ async function unpublishSurvey() {
 // ═════════════════════════════════════════════════════════
 
 function showSurveyDetails(survey) {
-    // Hide all sections except survey details
-    hideAllSections();
+    // Hide other sections
+    document.getElementById('surveyFormSection').style.display = 'none';
+    document.getElementById('surveysListSection').style.display = 'none';
     document.getElementById('surveyDetailsSection').style.display = 'block';
 
     // Populate survey metadata
