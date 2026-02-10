@@ -212,6 +212,7 @@ function displayDashboard(data) {
     document.getElementById('totalSurveys').textContent = data.surveys.total;
     document.getElementById('publishedSurveys').textContent = data.surveys.published;
     document.getElementById('completedSurveys').textContent = data.surveys.completed.toLocaleString();
+    document.getElementById('incompleteSurveys').textContent = data.surveys.incomplete.toLocaleString();
     document.getElementById('completionRate').textContent = `${data.surveys.completion_rate.toFixed(1)}%`;
 
     // Reward metrics
