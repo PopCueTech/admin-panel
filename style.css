@@ -917,6 +917,84 @@ body {
     color: #666;
 }
 
+/* ═════════════════════════════════════════════════════════
+   ENVIRONMENT SWITCHER BANNER
+   ═════════════════════════════════════════════════════════ */
+
+.env-banner {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    padding: 10px 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95em;
+    letter-spacing: 0.5px;
+    transition: background 0.3s ease;
+}
+
+.env-banner.env-prod {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
+}
+
+.env-banner.env-dev {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #1f2937;
+}
+
+.env-banner-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.env-label {
+    font-size: 1.1em;
+    min-width: 120px;
+}
+
+.env-toggle {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    padding: 3px;
+}
+
+.env-btn {
+    padding: 6px 18px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85em;
+    cursor: pointer;
+    background: transparent;
+    color: inherit;
+    transition: all 0.2s ease;
+}
+
+.env-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.env-btn.env-btn-active {
+    background: white;
+    color: #1f2937;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.env-url {
+    font-size: 0.8em;
+    opacity: 0.8;
+    font-weight: 400;
+    min-width: 120px;
+    text-align: right;
+}
+
 /* Navigation Tabs */
 .nav-tab {
     background: none;

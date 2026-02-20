@@ -7,6 +7,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Environment Switcher Banner (always visible) -->
+    <div id="envBanner" class="env-banner env-prod">
+        <div class="env-banner-content">
+            <span id="envLabel" class="env-label">PRODUCTION</span>
+            <div class="env-toggle">
+                <button id="envDevBtn" class="env-btn" onclick="switchEnv('dev')">DEV</button>
+                <button id="envProdBtn" class="env-btn env-btn-active" onclick="switchEnv('prod')">PROD</button>
+            </div>
+            <span id="envUrl" class="env-url">popcue-api-prod</span>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -152,10 +164,21 @@
                     <small id="contextCount" class="char-count">0/5000</small>
                 </div>
 
+                <div class="form-group">
+                    <label for="surveyType">Survey Type *</label>
+                    <select id="surveyType" required>
+                        <option value="">Select Survey Type</option>
+                        <option value="claim_message">Claim / Message Testing</option>
+                        <option value="packaging_design">Packaging / Design Testing</option>
+                        <option value="concept_test">Concept Testing</option>
+                    </select>
+                    <small>Determines which metrics will be calculated for this survey</small>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="surveyPoints">Points Reward</label>
-                        <input type="number" id="surveyPoints" value="50" min="10" max="500">
+                        <input type="number" id="surveyPoints" value="50" min="1" max="500">
                     </div>
 
                     <div class="form-group">

@@ -2,28 +2,164 @@
 // CONFIGURATION
 // ═════════════════════════════════════════════════════════
 
-const API_BASE_URL = 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app';
+const ENV_URLS = {
+    prod: 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app',
+    dev: 'https://popcue-api-812411253957.us-central1.run.app'
+};
+
+const ENV_KEY = 'popcue_admin_env';
 const TOKEN_KEY = 'popcue_admin_token';
+const REFRESH_TOKEN_KEY = 'popcue_admin_refresh_token';
 const USER_KEY = 'popcue_admin_user';
 const TENANT_ID_KEY = 'popcue_admin_tenant_id';
 
+let currentEnv = localStorage.getItem(ENV_KEY) || 'prod';
+let API_BASE_URL = ENV_URLS[currentEnv];
 let currentUser = null;
 let currentToken = null;
+let currentRefreshToken = null;
 let currentSurveyData = null;
+let refreshTimer = null;
+
+// ═════════════════════════════════════════════════════════
+// ENVIRONMENT SWITCHER
+// ═════════════════════════════════════════════════════════
+
+function initEnvSwitcher() {
+    updateEnvUI(currentEnv);
+}
+
+function switchEnv(env) {
+    if (env === currentEnv) return;
+
+    const label = env === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT';
+    if (!confirm(`Switch to ${label}? You will be logged out.`)) return;
+
+    // Logout from current env
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TENANT_ID_KEY);
+    currentToken = null;
+    currentRefreshToken = null;
+    currentUser = null;
+    if (refreshTimer) clearTimeout(refreshTimer);
+
+    // Switch env
+    currentEnv = env;
+    API_BASE_URL = ENV_URLS[env];
+    localStorage.setItem(ENV_KEY, env);
+
+    updateEnvUI(env);
+
+    // Show login
+    document.getElementById('authSection').style.display = 'block';
+    document.getElementById('mainPanel').style.display = 'none';
+    document.getElementById('authEmail').value = '';
+    document.getElementById('authPassword').value = '';
+
+    showToast(`Switched to ${label}`, 'success');
+}
+
+function updateEnvUI(env) {
+    const banner = document.getElementById('envBanner');
+    const label = document.getElementById('envLabel');
+    const url = document.getElementById('envUrl');
+    const devBtn = document.getElementById('envDevBtn');
+    const prodBtn = document.getElementById('envProdBtn');
+
+    banner.className = `env-banner env-${env}`;
+    label.textContent = env === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT';
+    url.textContent = env === 'prod' ? 'popcue-api-prod' : 'popcue-api-dev';
+
+    devBtn.classList.toggle('env-btn-active', env === 'dev');
+    prodBtn.classList.toggle('env-btn-active', env === 'prod');
+}
+
+// ═════════════════════════════════════════════════════════
+// TOKEN REFRESH
+// ═════════════════════════════════════════════════════════
+
+function scheduleTokenRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    // Refresh every 25 minutes (tokens typically expire at 30 min)
+    refreshTimer = setTimeout(refreshAccessToken, 25 * 60 * 1000);
+}
+
+async function refreshAccessToken() {
+    if (!currentRefreshToken) {
+        console.warn('No refresh token available');
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: currentRefreshToken })
+        });
+
+        if (!response.ok) {
+            console.error('Token refresh failed, logging out');
+            logout();
+            return false;
+        }
+
+        const data = await response.json();
+        currentToken = data.access_token;
+        localStorage.setItem(TOKEN_KEY, currentToken);
+
+        if (data.refresh_token) {
+            currentRefreshToken = data.refresh_token;
+            localStorage.setItem(REFRESH_TOKEN_KEY, currentRefreshToken);
+        }
+
+        console.log('Token refreshed successfully');
+        scheduleTokenRefresh();
+        return true;
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        return false;
+    }
+}
+
+async function fetchWithAuth(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = `Bearer ${currentToken}`;
+
+    let response = await fetch(url, options);
+
+    // If 401, try refreshing token and retry once
+    if (response.status === 401 && currentRefreshToken) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+            options.headers['Authorization'] = `Bearer ${currentToken}`;
+            response = await fetch(url, options);
+        }
+    }
+
+    return response;
+}
 
 // ═════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize environment switcher
+    initEnvSwitcher();
+
     // Check if user is already logged in
     const savedToken = localStorage.getItem(TOKEN_KEY);
     const savedUser = localStorage.getItem(USER_KEY);
+    const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (savedToken && savedUser) {
         currentToken = savedToken;
         currentUser = JSON.parse(savedUser);
+        currentRefreshToken = savedRefreshToken;
         showMainPanel();
+        scheduleTokenRefresh();
     }
 
     // Character counters
@@ -75,13 +211,18 @@ async function login() {
         const data = await response.json();
         currentToken = data.access_token;
         currentUser = data.user;
+        currentRefreshToken = data.refresh_token || null;
 
         // Save to localStorage
         localStorage.setItem(TOKEN_KEY, currentToken);
         localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+        if (currentRefreshToken) {
+            localStorage.setItem(REFRESH_TOKEN_KEY, currentRefreshToken);
+        }
 
         showToast('Login successful!', 'success');
         showMainPanel();
+        scheduleTokenRefresh();
     } catch (error) {
         showToast(`Login failed: ${error.message}`, 'error');
     }
@@ -89,10 +230,13 @@ async function login() {
 
 function logout() {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TENANT_ID_KEY);
     currentToken = null;
+    currentRefreshToken = null;
     currentUser = null;
+    if (refreshTimer) clearTimeout(refreshTimer);
 
     // Reset form
     const surveyForm = document.getElementById('surveyForm');
@@ -175,11 +319,8 @@ async function loadDashboard() {
     const timeFilter = document.getElementById('timeFilter').value;
 
     try {
-        const response = await fetch(
-            `${API_BASE_URL}/api/v1/admin/stats?time_filter=${timeFilter}`,
-            {
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            }
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/admin/stats?time_filter=${timeFilter}`
         );
 
         if (response.status === 403) {
@@ -248,12 +389,9 @@ async function refreshDashboard() {
     try {
         showToast('Refreshing stats...', 'info');
 
-        const response = await fetch(
+        const response = await fetchWithAuth(
             `${API_BASE_URL}/api/v1/admin/stats/refresh?time_filter=${timeFilter}`,
-            {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            }
+            { method: 'POST' }
         );
 
         if (!response.ok) {
@@ -294,12 +432,8 @@ async function loadSurveysList() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys`, {
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -350,12 +484,8 @@ async function loadSurveysList() {
 async function viewSurvey(surveyId) {
     try {
         // Fetch survey details
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}`, {
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -375,12 +505,9 @@ async function viewSurvey(surveyId) {
 
 async function publishSurveyDirect(surveyId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -404,12 +531,8 @@ async function loadTenants() {
 
     try {
         // Fetch real tenants from API
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/tenants`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${currentToken}`,
-                'Content-Type': 'application/json'
-            }
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/auth/tenants`, {
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -494,8 +617,9 @@ async function generateSurvey() {
     const context = document.getElementById('surveyContext').value;
     const points = parseInt(document.getElementById('surveyPoints').value);
     const tenantId = document.getElementById('tenantId').value;
+    const surveyType = document.getElementById('surveyType').value;
 
-    if (!name || !description || !context || !tenantId) {
+    if (!name || !description || !context || !tenantId || !surveyType) {
         showToast('Please fill in all required fields', 'error');
         return;
     }
@@ -506,18 +630,16 @@ async function generateSurvey() {
     document.getElementById('surveyForm').style.display = 'none';
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/generate-ai`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/generate-ai`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name,
                 description,
                 context,
                 points,
-                tenant_id: tenantId
+                tenant_id: tenantId,
+                survey_type: surveyType
             })
         });
 
@@ -583,6 +705,7 @@ function resetForm() {
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
     document.getElementById('contextCount').textContent = '0/5000';
+    document.getElementById('surveyType').value = '';
 }
 
 function copySurveyId() {
@@ -622,12 +745,9 @@ async function publishSurvey() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -661,12 +781,9 @@ async function unpublishSurvey() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/unpublish`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/unpublish`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -789,12 +906,7 @@ async function downloadSurveyReport() {
         loadingSpinner.style.display = 'flex';
 
         // Make API call to get PDF
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${surveyId}/report/pdf`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${currentToken}`
-            }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/report/pdf`);
 
         // Handle error responses
         if (!response.ok) {
@@ -877,12 +989,9 @@ async function unpublishSurveyFromDetail() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/surveys/${currentSurveyData.id}/unpublish`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${currentSurveyData.id}/unpublish`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentToken}`
-            }
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
