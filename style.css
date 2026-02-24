@@ -917,84 +917,6 @@ body {
     color: #666;
 }
 
-/* ═════════════════════════════════════════════════════════
-   ENVIRONMENT SWITCHER BANNER
-   ═════════════════════════════════════════════════════════ */
-
-.env-banner {
-    position: sticky;
-    top: 0;
-    z-index: 999;
-    padding: 10px 20px;
-    text-align: center;
-    font-weight: 700;
-    font-size: 0.95em;
-    letter-spacing: 0.5px;
-    transition: background 0.3s ease;
-}
-
-.env-banner.env-prod {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    color: white;
-}
-
-.env-banner.env-dev {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: #1f2937;
-}
-
-.env-banner-content {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.env-label {
-    font-size: 1.1em;
-    min-width: 120px;
-}
-
-.env-toggle {
-    display: flex;
-    gap: 4px;
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-    padding: 3px;
-}
-
-.env-btn {
-    padding: 6px 18px;
-    border: none;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: 0.85em;
-    cursor: pointer;
-    background: transparent;
-    color: inherit;
-    transition: all 0.2s ease;
-}
-
-.env-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.env-btn.env-btn-active {
-    background: white;
-    color: #1f2937;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.env-url {
-    font-size: 0.8em;
-    opacity: 0.8;
-    font-weight: 400;
-    min-width: 120px;
-    text-align: right;
-}
-
 /* Navigation Tabs */
 .nav-tab {
     background: none;
@@ -1014,4 +936,84 @@ body {
 
 .nav-tab:hover {
     color: #2196F3;
+}
+
+/* ═════════════════════════════════════════════════════════
+   ENVIRONMENT SWITCHER BANNER
+   ═════════════════════════════════════════════════════════ */
+
+.env-banner {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    max-width: 800px;
+    margin: 0 auto 0 auto;
+    border-radius: 12px 12px 0 0;
+}
+
+.env-prod {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.env-dev {
+    background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.env-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.env-label {
+    letter-spacing: 1px;
+    font-size: 12px;
+}
+
+.env-url {
+    font-weight: 400;
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+.env-toggle {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 2px;
+}
+
+.env-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 4px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+}
+
+.env-btn:hover {
+    color: white;
+}
+
+.env-btn-active {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+}
+
+/* When env banner is present, remove top border-radius from container */
+.env-banner + .container {
+    border-radius: 0 0 12px 12px;
 }

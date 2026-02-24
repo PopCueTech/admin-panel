@@ -7,15 +7,15 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Environment Switcher Banner (always visible) -->
+    <!-- Environment Switcher Banner -->
     <div id="envBanner" class="env-banner env-prod">
         <div class="env-banner-content">
             <span id="envLabel" class="env-label">PRODUCTION</span>
-            <div class="env-toggle">
-                <button id="envDevBtn" class="env-btn" onclick="switchEnv('dev')">DEV</button>
-                <button id="envProdBtn" class="env-btn env-btn-active" onclick="switchEnv('prod')">PROD</button>
-            </div>
-            <span id="envUrl" class="env-url">popcue-api-prod</span>
+            <span id="envUrl" class="env-url"></span>
+        </div>
+        <div class="env-toggle">
+            <button id="envProdBtn" class="env-btn env-btn-active" onclick="switchEnvironment('prod')">PROD</button>
+            <button id="envDevBtn" class="env-btn" onclick="switchEnvironment('dev')">DEV</button>
         </div>
     </div>
 
@@ -167,12 +167,11 @@
                 <div class="form-group">
                     <label for="surveyType">Survey Type *</label>
                     <select id="surveyType" required>
-                        <option value="">Select Survey Type</option>
+                        <option value="" disabled selected>-- Select Survey Type --</option>
                         <option value="claim_message">Claim / Message Testing</option>
                         <option value="packaging_design">Packaging / Design Testing</option>
                         <option value="concept_test">Concept Testing</option>
                     </select>
-                    <small>Determines which metrics will be calculated for this survey</small>
                 </div>
 
                 <div class="form-row">
@@ -181,6 +180,13 @@
                         <input type="number" id="surveyPoints" value="50" min="1" max="500">
                     </div>
 
+                    <div class="form-group">
+                        <label for="maxResponses">Max Responses</label>
+                        <input type="number" id="maxResponses" value="100" min="1" max="10000">
+                    </div>
+                </div>
+
+                <div class="form-row">
                     <div class="form-group">
                         <label for="tenantId">Tenant ID *</label>
                         <select id="tenantId" required>
@@ -312,6 +318,11 @@
                             <div class="detail-item">
                                 <label>Points Reward:</label>
                                 <span id="surveyPointsDetail">0</span>
+                            </div>
+
+                            <div class="detail-item">
+                                <label>Max Responses:</label>
+                                <span id="surveyMaxResponsesDetail">100</span>
                             </div>
 
                             <div class="detail-item">

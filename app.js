@@ -2,164 +2,38 @@
 // CONFIGURATION
 // ═════════════════════════════════════════════════════════
 
-const ENV_URLS = {
-    prod: 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app',
-    dev: 'https://popcue-api-812411253957.us-central1.run.app'
-};
-
-const ENV_KEY = 'popcue_admin_env';
+const API_URL_PROD = 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app';
+const API_URL_DEV = 'https://popcue-api-dev-g7mtgi7cwa-uc.a.run.app';
 const TOKEN_KEY = 'popcue_admin_token';
 const REFRESH_TOKEN_KEY = 'popcue_admin_refresh_token';
 const USER_KEY = 'popcue_admin_user';
 const TENANT_ID_KEY = 'popcue_admin_tenant_id';
+const ENV_KEY = 'popcue_admin_env';
 
-let currentEnv = localStorage.getItem(ENV_KEY) || 'prod';
-let API_BASE_URL = ENV_URLS[currentEnv];
+let API_BASE_URL = API_URL_PROD;
 let currentUser = null;
 let currentToken = null;
-let currentRefreshToken = null;
 let currentSurveyData = null;
 let refreshTimer = null;
-
-// ═════════════════════════════════════════════════════════
-// ENVIRONMENT SWITCHER
-// ═════════════════════════════════════════════════════════
-
-function initEnvSwitcher() {
-    updateEnvUI(currentEnv);
-}
-
-function switchEnv(env) {
-    if (env === currentEnv) return;
-
-    const label = env === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT';
-    if (!confirm(`Switch to ${label}? You will be logged out.`)) return;
-
-    // Logout from current env
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TENANT_ID_KEY);
-    currentToken = null;
-    currentRefreshToken = null;
-    currentUser = null;
-    if (refreshTimer) clearTimeout(refreshTimer);
-
-    // Switch env
-    currentEnv = env;
-    API_BASE_URL = ENV_URLS[env];
-    localStorage.setItem(ENV_KEY, env);
-
-    updateEnvUI(env);
-
-    // Show login
-    document.getElementById('authSection').style.display = 'block';
-    document.getElementById('mainPanel').style.display = 'none';
-    document.getElementById('authEmail').value = '';
-    document.getElementById('authPassword').value = '';
-
-    showToast(`Switched to ${label}`, 'success');
-}
-
-function updateEnvUI(env) {
-    const banner = document.getElementById('envBanner');
-    const label = document.getElementById('envLabel');
-    const url = document.getElementById('envUrl');
-    const devBtn = document.getElementById('envDevBtn');
-    const prodBtn = document.getElementById('envProdBtn');
-
-    banner.className = `env-banner env-${env}`;
-    label.textContent = env === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT';
-    url.textContent = env === 'prod' ? 'popcue-api-prod' : 'popcue-api-dev';
-
-    devBtn.classList.toggle('env-btn-active', env === 'dev');
-    prodBtn.classList.toggle('env-btn-active', env === 'prod');
-}
-
-// ═════════════════════════════════════════════════════════
-// TOKEN REFRESH
-// ═════════════════════════════════════════════════════════
-
-function scheduleTokenRefresh() {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    // Refresh every 25 minutes (tokens typically expire at 30 min)
-    refreshTimer = setTimeout(refreshAccessToken, 25 * 60 * 1000);
-}
-
-async function refreshAccessToken() {
-    if (!currentRefreshToken) {
-        console.warn('No refresh token available');
-        return false;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: currentRefreshToken })
-        });
-
-        if (!response.ok) {
-            console.error('Token refresh failed, logging out');
-            logout();
-            return false;
-        }
-
-        const data = await response.json();
-        currentToken = data.access_token;
-        localStorage.setItem(TOKEN_KEY, currentToken);
-
-        if (data.refresh_token) {
-            currentRefreshToken = data.refresh_token;
-            localStorage.setItem(REFRESH_TOKEN_KEY, currentRefreshToken);
-        }
-
-        console.log('Token refreshed successfully');
-        scheduleTokenRefresh();
-        return true;
-    } catch (error) {
-        console.error('Token refresh error:', error);
-        return false;
-    }
-}
-
-async function fetchWithAuth(url, options = {}) {
-    options.headers = options.headers || {};
-    options.headers['Authorization'] = `Bearer ${currentToken}`;
-
-    let response = await fetch(url, options);
-
-    // If 401, try refreshing token and retry once
-    if (response.status === 401 && currentRefreshToken) {
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-            options.headers['Authorization'] = `Bearer ${currentToken}`;
-            response = await fetch(url, options);
-        }
-    }
-
-    return response;
-}
 
 // ═════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize environment switcher
-    initEnvSwitcher();
+    // Load saved environment
+    const savedEnv = localStorage.getItem(ENV_KEY) || 'prod';
+    applyEnvironment(savedEnv);
 
     // Check if user is already logged in
     const savedToken = localStorage.getItem(TOKEN_KEY);
     const savedUser = localStorage.getItem(USER_KEY);
-    const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (savedToken && savedUser) {
         currentToken = savedToken;
         currentUser = JSON.parse(savedUser);
-        currentRefreshToken = savedRefreshToken;
+        startRefreshTimer();
         showMainPanel();
-        scheduleTokenRefresh();
     }
 
     // Character counters
@@ -211,32 +85,30 @@ async function login() {
         const data = await response.json();
         currentToken = data.access_token;
         currentUser = data.user;
-        currentRefreshToken = data.refresh_token || null;
 
         // Save to localStorage
         localStorage.setItem(TOKEN_KEY, currentToken);
         localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
-        if (currentRefreshToken) {
-            localStorage.setItem(REFRESH_TOKEN_KEY, currentRefreshToken);
+        if (data.refresh_token) {
+            localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
         }
 
+        startRefreshTimer();
         showToast('Login successful!', 'success');
         showMainPanel();
-        scheduleTokenRefresh();
     } catch (error) {
         showToast(`Login failed: ${error.message}`, 'error');
     }
 }
 
 function logout() {
+    stopRefreshTimer();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TENANT_ID_KEY);
     currentToken = null;
-    currentRefreshToken = null;
     currentUser = null;
-    if (refreshTimer) clearTimeout(refreshTimer);
 
     // Reset form
     const surveyForm = document.getElementById('surveyForm');
@@ -433,6 +305,7 @@ async function loadSurveysList() {
 
     try {
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys`, {
+            method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
 
@@ -485,6 +358,7 @@ async function viewSurvey(surveyId) {
     try {
         // Fetch survey details
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}`, {
+            method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
 
@@ -532,6 +406,7 @@ async function loadTenants() {
     try {
         // Fetch real tenants from API
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/auth/tenants`, {
+            method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
 
@@ -608,6 +483,144 @@ function showToast(message, type = 'info') {
 }
 
 // ═════════════════════════════════════════════════════════
+// ENVIRONMENT SWITCHER
+// ═════════════════════════════════════════════════════════
+
+function applyEnvironment(env) {
+    const banner = document.getElementById('envBanner');
+    const label = document.getElementById('envLabel');
+    const urlDisplay = document.getElementById('envUrl');
+    const prodBtn = document.getElementById('envProdBtn');
+    const devBtn = document.getElementById('envDevBtn');
+
+    if (env === 'dev') {
+        API_BASE_URL = API_URL_DEV;
+        banner.className = 'env-banner env-dev';
+        label.textContent = 'DEVELOPMENT';
+        urlDisplay.textContent = API_URL_DEV.replace('https://', '');
+        prodBtn.classList.remove('env-btn-active');
+        devBtn.classList.add('env-btn-active');
+    } else {
+        API_BASE_URL = API_URL_PROD;
+        banner.className = 'env-banner env-prod';
+        label.textContent = 'PRODUCTION';
+        urlDisplay.textContent = API_URL_PROD.replace('https://', '');
+        prodBtn.classList.add('env-btn-active');
+        devBtn.classList.remove('env-btn-active');
+    }
+}
+
+function switchEnvironment(env) {
+    const currentEnv = localStorage.getItem(ENV_KEY) || 'prod';
+    if (env === currentEnv) return;
+
+    const envName = env === 'dev' ? 'DEVELOPMENT' : 'PRODUCTION';
+    if (!confirm(`Switch to ${envName} environment? You will be logged out.`)) {
+        return;
+    }
+
+    // Logout and clear state
+    stopRefreshTimer();
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TENANT_ID_KEY);
+    currentToken = null;
+    currentUser = null;
+
+    // Save new env and apply
+    localStorage.setItem(ENV_KEY, env);
+    applyEnvironment(env);
+
+    // Reset UI to login
+    const surveyForm = document.getElementById('surveyForm');
+    if (surveyForm) surveyForm.reset();
+    const responseSection = document.getElementById('responseSection');
+    if (responseSection) responseSection.style.display = 'none';
+
+    document.getElementById('authSection').style.display = 'block';
+    document.getElementById('mainPanel').style.display = 'none';
+    document.getElementById('authEmail').value = '';
+    document.getElementById('authPassword').value = '';
+
+    showToast(`Switched to ${envName}`, 'success');
+}
+
+// ═════════════════════════════════════════════════════════
+// REFRESH TOKEN HANDLING
+// ═════════════════════════════════════════════════════════
+
+function startRefreshTimer() {
+    stopRefreshTimer();
+    // Refresh token every 25 minutes (access tokens typically expire at 30 min)
+    refreshTimer = setTimeout(refreshAccessToken, 25 * 60 * 1000);
+}
+
+function stopRefreshTimer() {
+    if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+async function refreshAccessToken() {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+        console.warn('No refresh token available');
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (!response.ok) {
+            console.error('Token refresh failed, logging out');
+            logout();
+            return false;
+        }
+
+        const data = await response.json();
+        currentToken = data.access_token;
+        localStorage.setItem(TOKEN_KEY, currentToken);
+
+        if (data.refresh_token) {
+            localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+        }
+
+        startRefreshTimer();
+        console.log('Token refreshed successfully');
+        return true;
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        logout();
+        return false;
+    }
+}
+
+async function fetchWithAuth(url, options = {}) {
+    // Add auth header
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = `Bearer ${currentToken}`;
+
+    let response = await fetch(url, options);
+
+    // If 401, attempt token refresh and retry once
+    if (response.status === 401) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+            options.headers['Authorization'] = `Bearer ${currentToken}`;
+            response = await fetch(url, options);
+        }
+    }
+
+    return response;
+}
+
+// ═════════════════════════════════════════════════════════
 // SURVEY GENERATION
 // ═════════════════════════════════════════════════════════
 
@@ -616,6 +629,7 @@ async function generateSurvey() {
     const description = document.getElementById('surveyDescription').value;
     const context = document.getElementById('surveyContext').value;
     const points = parseInt(document.getElementById('surveyPoints').value);
+    const maxResponses = parseInt(document.getElementById('maxResponses').value) || 100;
     const tenantId = document.getElementById('tenantId').value;
     const surveyType = document.getElementById('surveyType').value;
 
@@ -632,14 +646,17 @@ async function generateSurvey() {
     try {
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/generate-ai`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
                 name,
                 description,
                 context,
                 points,
+                max_responses: maxResponses,
                 tenant_id: tenantId,
-                survey_type: surveyType
+                test_type: surveyType
             })
         });
 
@@ -700,12 +717,12 @@ function displaySurveyResponse(data) {
 
 function resetForm() {
     document.getElementById('surveyForm').reset();
+    document.getElementById('surveyType').value = '';
     document.getElementById('responseSection').style.display = 'none';
     document.getElementById('surveyForm').style.display = 'block';
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
     document.getElementById('contextCount').textContent = '0/5000';
-    document.getElementById('surveyType').value = '';
 }
 
 function copySurveyId() {
@@ -724,6 +741,7 @@ function goToDashboard() {
 
     // Reset form
     document.getElementById('surveyForm').reset();
+    document.getElementById('surveyType').value = '';
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
     document.getElementById('contextCount').textContent = '0/5000';
@@ -818,6 +836,7 @@ function showSurveyDetails(survey) {
     document.getElementById('surveyDescriptionDetail').textContent = survey.description || 'No description';
     document.getElementById('surveyIdDetail').textContent = survey.id;
     document.getElementById('surveyPointsDetail').textContent = survey.points || 0;
+    document.getElementById('surveyMaxResponsesDetail').textContent = survey.max_responses || 100;
     document.getElementById('surveyCreatedDetail').textContent = new Date(survey.created_at).toLocaleDateString();
 
     // Set status badge
@@ -906,7 +925,9 @@ async function downloadSurveyReport() {
         loadingSpinner.style.display = 'flex';
 
         // Make API call to get PDF
-        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/report/pdf`);
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/report/pdf`, {
+            method: 'GET',
+        });
 
         // Handle error responses
         if (!response.ok) {
