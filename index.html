@@ -266,6 +266,7 @@
                                 <th>Survey Title</th>
                                 <th>Questions</th>
                                 <th>Status</th>
+                                <th>Responses</th>
                                 <th>Created</th>
                                 <th>Actions</th>
                             </tr>
@@ -345,6 +346,41 @@
                             <div id="questionsListDetail" class="questions-list">
                                 <p>Loading questions...</p>
                             </div>
+                        </details>
+                    </div>
+
+                    <!-- Metrics Card -->
+                    <div id="metricsCard" class="details-card" style="display: none;">
+                        <div class="card-header">
+                            <h3>Survey Metrics</h3>
+                            <button class="btn btn-secondary btn-sm" onclick="loadSurveyMetrics(currentSurveyData.id)">Refresh</button>
+                        </div>
+
+                        <!-- Response Stats -->
+                        <div class="metrics-summary">
+                            <div class="metric-stat">
+                                <span class="metric-stat-value" id="metricCompletedSessions">0</span>
+                                <span class="metric-stat-label">Completed</span>
+                            </div>
+                            <div class="metric-stat">
+                                <span class="metric-stat-value" id="metricTotalResponses">0</span>
+                                <span class="metric-stat-label">Total Responses</span>
+                            </div>
+                            <div class="metric-stat">
+                                <span class="metric-stat-value" id="metricCompletionRate">0%</span>
+                                <span class="metric-stat-label">Completion Rate</span>
+                            </div>
+                        </div>
+
+                        <!-- KPI Metrics -->
+                        <div id="kpiMetrics" class="kpi-grid">
+                            <p class="no-data">No metrics data yet</p>
+                        </div>
+
+                        <!-- Per-Question Analytics -->
+                        <details class="questions-preview" id="questionAnalyticsSection" style="display: none;">
+                            <summary>Per-Question Analytics</summary>
+                            <div id="questionAnalyticsList" class="question-analytics-list"></div>
                         </details>
                     </div>
 

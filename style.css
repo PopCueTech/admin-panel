@@ -1017,3 +1017,177 @@ body {
 .env-banner + .container {
     border-radius: 0 0 12px 12px;
 }
+
+/* ═════════════════════════════════════════════════════════
+   METRICS DISPLAY
+   ═════════════════════════════════════════════════════════ */
+
+.metrics-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.metric-stat {
+    flex: 1;
+    text-align: center;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.metric-stat-value {
+    display: block;
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.metric-stat-label {
+    display: block;
+    font-size: 0.85em;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.kpi-card {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.kpi-card.kpi-wide {
+    grid-column: 1 / -1;
+    text-align: left;
+    align-items: stretch;
+}
+
+.kpi-icon {
+    font-size: 1.4em;
+}
+
+.kpi-value {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.kpi-label {
+    font-size: 0.8em;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Pick Rates */
+.pick-rates-list {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.pick-rate-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.pick-rate-label {
+    min-width: 80px;
+    font-size: 0.85em;
+    color: #475569;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.pick-rate-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pick-rate-bar {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.pick-rate-value {
+    min-width: 50px;
+    text-align: right;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+/* Question Analytics */
+.question-analytics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.qa-item {
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.qa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.qa-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.9em;
+}
+
+.qa-stats span {
+    color: #475569;
+}
+
+.qa-distribution {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dist-item {
+    padding: 2px 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: #475569;
+}
+
+.no-data {
+    text-align: center;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 20px;
+}

@@ -3,7 +3,7 @@
 // ═════════════════════════════════════════════════════════
 
 const API_URL_PROD = 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app';
-const API_URL_DEV = 'https://popcue-api-812411253957.us-central1.run.app';
+const API_URL_DEV = 'https://popcue-api-dev-g7mtgi7cwa-uc.a.run.app';
 const TOKEN_KEY = 'popcue_admin_token';
 const REFRESH_TOKEN_KEY = 'popcue_admin_refresh_token';
 const USER_KEY = 'popcue_admin_user';
@@ -304,7 +304,8 @@ async function loadSurveysList() {
     }
 
     try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys`, {
+        // Use admin endpoint to get ALL surveys (not filtered by user/active)
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/surveys`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -323,16 +324,17 @@ async function loadSurveysList() {
 
         if (noCurveysMessage) noCurveysMessage.style.display = 'none';
 
-        // Populate table with surveys
+        // Populate table with surveys (includes completed_count from admin endpoint)
         tableBody.innerHTML = surveys.map(survey => `
             <tr>
                 <td><strong>${survey.title || 'Untitled'}</strong></td>
-                <td>${survey.current_version?.structure?.questions?.length || 0}</td>
+                <td>${survey.questions_count || 0}</td>
                 <td>
                     <span class="status-${survey.is_active ? 'active' : 'draft'}">
                         ${survey.is_active ? '✓ Published' : '⏱ Draft'}
                     </span>
                 </td>
+                <td>${survey.completed_count || 0} / ${survey.max_responses || 100}</td>
                 <td>${new Date(survey.created_at).toLocaleDateString()}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="viewSurvey('${survey.id}')">View</button>
@@ -345,8 +347,8 @@ async function loadSurveysList() {
     } catch (error) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align: center; padding: 20px; color: #e74c3c;">
-                    ❌ Error loading surveys: ${error.message}
+                <td colspan="6" style="text-align: center; padding: 20px; color: #e74c3c;">
+                    Error loading surveys: ${error.message}
                 </td>
             </tr>
         `;
@@ -356,7 +358,7 @@ async function loadSurveysList() {
 
 async function viewSurvey(surveyId) {
     try {
-        // Fetch survey details
+        // Fetch survey details using the regular endpoint
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
@@ -371,6 +373,9 @@ async function viewSurvey(surveyId) {
 
         // Navigate to details view
         showSurveyDetails(surveyData);
+
+        // Load metrics in background
+        loadSurveyMetrics(surveyId);
     } catch (error) {
         showToast(`Error loading survey: ${error.message}`, 'error');
         console.error('Error:', error);
@@ -1029,4 +1034,153 @@ async function unpublishSurveyFromDetail() {
         showToast(`Error: ${error.message}`, 'error');
         console.error('Unpublish error:', error);
     }
+}
+
+
+// ═════════════════════════════════════════════════════════
+// SURVEY METRICS
+// ═════════════════════════════════════════════════════════
+
+async function loadSurveyMetrics(surveyId) {
+    const metricsCard = document.getElementById('metricsCard');
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/metrics`);
+
+        if (!response.ok) {
+            // If 404 or no data, just hide metrics card
+            if (response.status === 404) {
+                metricsCard.style.display = 'none';
+                return;
+            }
+            throw new Error('Failed to load metrics');
+        }
+
+        const data = await response.json();
+        displayMetrics(data);
+        metricsCard.style.display = 'block';
+
+    } catch (error) {
+        console.error('Metrics load error:', error);
+        metricsCard.style.display = 'none';
+    }
+}
+
+function displayMetrics(data) {
+    // Response stats
+    document.getElementById('metricCompletedSessions').textContent = data.completed_sessions || 0;
+    document.getElementById('metricTotalResponses').textContent = data.total_responses || 0;
+    document.getElementById('metricCompletionRate').textContent =
+        `${(data.completion_rate || 0).toFixed(1)}%`;
+
+    // KPI metrics
+    const kpiContainer = document.getElementById('kpiMetrics');
+    const metrics = data.metrics || {};
+
+    if (!metrics || Object.keys(metrics).length === 0) {
+        kpiContainer.innerHTML = '<p class="no-data">No metrics data yet. Metrics are calculated after survey responses are submitted.</p>';
+        return;
+    }
+
+    let kpiHTML = '';
+
+    // Display each metric as a card
+    const metricLabels = {
+        purchase_intent_percent: { label: 'Purchase Intent', unit: '%', icon: '🛒' },
+        clarity_score: { label: 'Clarity Score', unit: '/5', icon: '💡' },
+        visual_appeal_score: { label: 'Visual Appeal', unit: '/5', icon: '🎨' },
+        perceived_quality_score: { label: 'Perceived Quality', unit: '/5', icon: '⭐' },
+        shelf_impact_score: { label: 'Shelf Impact', unit: '/5', icon: '📦' },
+        repeat_intent_percent: { label: 'Repeat Intent', unit: '%', icon: '🔄' },
+        appeal_score: { label: 'Appeal', unit: '/5', icon: '❤️' },
+        decision_time_median_ms: { label: 'Decision Time', unit: 'ms', icon: '⏱️' },
+        decision_time_mean_seconds: { label: 'Decision Time', unit: 's', icon: '⏱️' },
+        hesitation_rate_percent: { label: 'Hesitation Rate', unit: '%', icon: '🤔' },
+    };
+
+    // Track which decision_time key we show (prefer median_ms if present)
+    let shownDecisionTime = false;
+
+    for (const [key, value] of Object.entries(metrics)) {
+        if (key === 'pick_rates' || key === 'attribute_drivers') continue;
+        if (value === null || value === undefined) continue;
+
+        // Avoid showing both decision_time variants
+        if (key === 'decision_time_mean_seconds' && metrics.decision_time_median_ms != null) continue;
+        if (key.startsWith('decision_time') && shownDecisionTime) continue;
+        if (key.startsWith('decision_time')) shownDecisionTime = true;
+
+        const info = metricLabels[key] || { label: formatMetricLabel(key), unit: '', icon: '📊' };
+        const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+
+        kpiHTML += `
+            <div class="kpi-card">
+                <span class="kpi-icon">${info.icon}</span>
+                <span class="kpi-value">${displayValue}${info.unit}</span>
+                <span class="kpi-label">${info.label}</span>
+            </div>
+        `;
+    }
+
+    // Pick rates
+    if (metrics.pick_rates && Object.keys(metrics.pick_rates).length > 0) {
+        kpiHTML += `
+            <div class="kpi-card kpi-wide">
+                <span class="kpi-icon">🎯</span>
+                <span class="kpi-label">Pick Rates</span>
+                <div class="pick-rates-list">
+                    ${Object.entries(metrics.pick_rates).map(([option, pct]) =>
+                        `<div class="pick-rate-item">
+                            <span class="pick-rate-label">${option}</span>
+                            <div class="pick-rate-bar-bg">
+                                <div class="pick-rate-bar" style="width: ${pct}%"></div>
+                            </div>
+                            <span class="pick-rate-value">${pct.toFixed(1)}%</span>
+                        </div>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    kpiContainer.innerHTML = kpiHTML || '<p class="no-data">No metrics data yet</p>';
+
+    // Question analytics
+    const qaSection = document.getElementById('questionAnalyticsSection');
+    const qaList = document.getElementById('questionAnalyticsList');
+
+    if (data.question_analytics && data.question_analytics.length > 0) {
+        qaSection.style.display = 'block';
+        qaList.innerHTML = data.question_analytics.map(qa => `
+            <div class="qa-item">
+                <div class="qa-header">
+                    <strong>${qa.question_id}</strong>
+                    <span class="question-type">${qa.question_type || ''}</span>
+                </div>
+                <div class="qa-stats">
+                    ${qa.mean !== undefined && qa.mean !== null ?
+                        `<span>Mean: <strong>${qa.mean.toFixed(2)}</strong></span>` : ''}
+                    ${qa.median !== undefined && qa.median !== null ?
+                        `<span>Median: <strong>${qa.median.toFixed(2)}</strong></span>` : ''}
+                    ${qa.response_count !== undefined ?
+                        `<span>Responses: <strong>${qa.response_count}</strong></span>` : ''}
+                    ${qa.top_box_percent !== undefined && qa.top_box_percent !== null ?
+                        `<span>Top Box: <strong>${qa.top_box_percent.toFixed(1)}%</strong></span>` : ''}
+                </div>
+                ${qa.distribution ? `
+                    <div class="qa-distribution">
+                        ${Object.entries(qa.distribution).map(([val, count]) =>
+                            `<span class="dist-item">${val}: ${count}</span>`
+                        ).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+    } else {
+        qaSection.style.display = 'none';
+    }
+}
+
+function formatMetricLabel(key) {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
