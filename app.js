@@ -310,8 +310,18 @@ async function loadSurveysList() {
             headers: { 'Content-Type': 'application/json' }
         });
 
+        if (response.status === 403) {
+            showToast('Admin access required to view surveys', 'error');
+            throw new Error('Admin access required (403 Forbidden)');
+        }
+
         if (!response.ok) {
-            throw new Error('Failed to load surveys');
+            let detail = `HTTP ${response.status}`;
+            try {
+                const errData = await response.json();
+                detail = errData.detail || detail;
+            } catch (e) {}
+            throw new Error(detail);
         }
 
         const surveys = await response.json();
@@ -1048,12 +1058,22 @@ async function loadSurveyMetrics(surveyId) {
         const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/metrics`);
 
         if (!response.ok) {
-            // If 404 or no data, just hide metrics card
+            // If 404 or no data, show card with "no data" message
             if (response.status === 404) {
-                metricsCard.style.display = 'none';
+                metricsCard.style.display = 'block';
+                document.getElementById('metricCompletedSessions').textContent = '0';
+                document.getElementById('metricTotalResponses').textContent = '0';
+                document.getElementById('metricCompletionRate').textContent = '0%';
+                document.getElementById('kpiMetrics').innerHTML = '<p class="no-data">No responses yet. Metrics will appear after users complete this survey.</p>';
+                document.getElementById('questionAnalyticsSection').style.display = 'none';
                 return;
             }
-            throw new Error('Failed to load metrics');
+            let detail = `HTTP ${response.status}`;
+            try {
+                const errData = await response.json();
+                detail = errData.detail || detail;
+            } catch (e) {}
+            throw new Error(detail);
         }
 
         const data = await response.json();
@@ -1062,7 +1082,8 @@ async function loadSurveyMetrics(surveyId) {
 
     } catch (error) {
         console.error('Metrics load error:', error);
-        metricsCard.style.display = 'none';
+        metricsCard.style.display = 'block';
+        document.getElementById('kpiMetrics').innerHTML = `<p class="no-data">Failed to load metrics: ${error.message}</p>`;
     }
 }
 
