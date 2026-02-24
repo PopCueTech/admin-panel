@@ -3,7 +3,7 @@
 // ═════════════════════════════════════════════════════════
 
 const API_URL_PROD = 'https://popcue-api-prod-g7mtgi7cwa-uc.a.run.app';
-const API_URL_DEV = 'https://popcue-api-dev-g7mtgi7cwa-uc.a.run.app';
+const API_URL_DEV = 'https://popcue-api-812411253957.us-central1.run.app';
 const TOKEN_KEY = 'popcue_admin_token';
 const REFRESH_TOKEN_KEY = 'popcue_admin_refresh_token';
 const USER_KEY = 'popcue_admin_user';
