@@ -1097,15 +1097,70 @@ function displayMetrics(data) {
     // KPI metrics
     const kpiContainer = document.getElementById('kpiMetrics');
     const metrics = data.metrics || {};
+    const concepts = data.concepts || {};
+    const isMultiConcept = data.is_multi_concept || false;
 
-    if (!metrics || Object.keys(metrics).length === 0) {
+    if ((!metrics || Object.keys(metrics).length === 0) && !isMultiConcept) {
         kpiContainer.innerHTML = '<p class="no-data">No metrics data yet. Metrics are calculated after survey responses are submitted.</p>';
         return;
     }
 
     let kpiHTML = '';
 
-    // Display each metric as a card
+    // Multi-concept comparison section
+    if (isMultiConcept && Object.keys(concepts).length > 0) {
+        const conceptMetricLabels = {
+            purchase_intent: { label: 'Purchase Intent', icon: '🛒', unit: '%', scale: 100 },
+            repeat_intent: { label: 'Repeat Intent', icon: '🔄', unit: '%', scale: 100 },
+            appeal: { label: 'Appeal', icon: '❤️', unit: '/100', scale: 100 },
+        };
+
+        kpiHTML += `<div class="concept-comparison">
+            <h4>Concept Comparison</h4>
+            <div class="concept-table">
+                <div class="concept-header-row">
+                    <div class="concept-metric-label">Metric</div>
+                    ${Object.entries(concepts).map(([id, c]) =>
+                        `<div class="concept-col-header">${c.label || id}</div>`
+                    ).join('')}
+                </div>`;
+
+        // Collect all metric keys across concepts (excluding "label")
+        const allMetricKeys = new Set();
+        for (const c of Object.values(concepts)) {
+            for (const key of Object.keys(c)) {
+                if (key !== 'label') allMetricKeys.add(key);
+            }
+        }
+
+        for (const metricKey of allMetricKeys) {
+            const info = conceptMetricLabels[metricKey] || { label: formatMetricLabel(metricKey), icon: '📊', unit: '', scale: 100 };
+            const conceptEntries = Object.entries(concepts);
+            const values = conceptEntries.map(([, c]) => c[metricKey]).filter(v => v != null);
+            const maxVal = values.length > 0 ? Math.max(...values) : 100;
+
+            kpiHTML += `
+                <div class="concept-row">
+                    <div class="concept-metric-label">${info.icon} ${info.label}</div>
+                    ${conceptEntries.map(([id, c]) => {
+                        const val = c[metricKey];
+                        if (val == null) return `<div class="concept-cell">-</div>`;
+                        const barWidth = maxVal > 0 ? (val / info.scale) * 100 : 0;
+                        const isTop = val === maxVal && values.length > 1;
+                        return `<div class="concept-cell ${isTop ? 'concept-winner' : ''}">
+                            <div class="concept-bar-bg">
+                                <div class="concept-bar" style="width: ${Math.min(barWidth, 100)}%"></div>
+                            </div>
+                            <span class="concept-value">${val.toFixed(1)}${info.unit}</span>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+        }
+
+        kpiHTML += `</div></div>`;
+    }
+
+    // Display each metric as a card (shared/non-concept metrics)
     const metricLabels = {
         purchase_intent_percent: { label: 'Purchase Intent', unit: '%', icon: '🛒' },
         clarity_score: { label: 'Clarity Score', unit: '/5', icon: '💡' },
