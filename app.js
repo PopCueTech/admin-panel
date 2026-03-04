@@ -870,12 +870,21 @@ function showSurveyDetails(survey) {
         const questions = survey.current_version.structure.questions;
         document.getElementById('surveyQuestionsDetail').textContent = questions.length;
 
-        questionsList.innerHTML = questions.map((q, idx) => `
-            <div class="question-item">
-                <strong>Q${idx + 1}:</strong> ${q.label || q.text || 'Untitled Question'}
-                <span class="question-type">(${q.type})</span>
-            </div>
-        `).join('');
+        questionsList.innerHTML = questions.map((q, idx) => {
+            const options = q.answers || q.options || [];
+            const optionsHTML = options.length > 0 ? `
+                <div style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #e5e7eb;">
+                    ${options.map(opt => `<div style="font-size: 0.9em; color: #666; padding: 4px 0;">• ${opt.label || opt.text || opt}</div>`).join('')}
+                </div>
+            ` : '';
+            return `
+                <div class="question-item">
+                    <strong>Q${idx + 1}:</strong> ${q.label || q.text || 'Untitled Question'}
+                    <span class="question-type">(${q.type})</span>
+                    ${optionsHTML}
+                </div>
+            `;
+        }).join('');
     } else {
         document.getElementById('surveyQuestionsDetail').textContent = '0';
         questionsList.innerHTML = '<p>No questions available</p>';

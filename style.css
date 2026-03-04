@@ -1035,6 +1035,8 @@ body {
     background: #f8fafc;
     border-radius: 8px;
     border: 1px solid var(--border-color);
+    overflow: hidden;
+    word-wrap: break-word;
 }
 
 .metric-stat-value {
@@ -1068,6 +1070,9 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 4px;
+    overflow: hidden;
+    word-wrap: break-word;
+    word-break: break-word;
 }
 
 .kpi-card.kpi-wide {
@@ -1091,6 +1096,10 @@ body {
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 /* Pick Rates */
@@ -1108,11 +1117,13 @@ body {
 
 .pick-rate-label {
     min-width: 80px;
+    max-width: 120px;
     font-size: 0.85em;
     color: #475569;
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
+    word-wrap: break-word;
 }
 
 .pick-rate-bar-bg {
