@@ -284,6 +284,7 @@ function hideAllSections() {
     document.getElementById('dashboardSection').style.display = 'none';
     document.getElementById('surveyFormSection').style.display = 'none';
     document.getElementById('surveysListSection').style.display = 'none';
+    document.getElementById('notificationsSection').style.display = 'none';
     document.getElementById('surveyDetailsSection').style.display = 'none';
 }
 
@@ -292,6 +293,7 @@ function setActiveTab(tab) {
     if (tab === 'dashboard') document.querySelectorAll('.nav-tab')[0].classList.add('active');
     if (tab === 'create') document.querySelectorAll('.nav-tab')[1].classList.add('active');
     if (tab === 'list') document.querySelectorAll('.nav-tab')[2].classList.add('active');
+    if (tab === 'notifications') document.querySelectorAll('.nav-tab')[3].classList.add('active');
 }
 
 async function loadSurveysList() {
@@ -671,7 +673,8 @@ async function generateSurvey() {
                 points,
                 max_responses: maxResponses,
                 tenant_id: tenantId,
-                test_type: surveyType
+                test_type: surveyType,
+                concepts: getConceptsFromForm()  // ss: send concepts with image URLs
             })
         });
 
@@ -1268,4 +1271,128 @@ function displayMetrics(data) {
 
 function formatMetricLabel(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+
+// ss: collect concept labels and image URLs from concept cards
+function getConceptsFromForm() {
+    const cards = document.getElementById('conceptCards');
+    if (!cards) return [];
+    const concepts = [];
+    Array.from(cards.children).forEach((card) => {
+        const idMatch = card.id.match(/concept-card-(\d+)/);
+        if (!idMatch) return;
+        const cid = idMatch[1];
+        const label = (document.getElementById(`concept-label-${cid}`)?.value || '').trim();
+        const imageUrl = (document.getElementById(`concept-imageurl-${cid}`)?.value || '').trim();
+        if (label) {
+            concepts.push({
+                id: label.toLowerCase().replace(/\s+/g, '_'),
+                label,
+                image_url: imageUrl || null
+            });
+        }
+    });
+    return concepts;
+}
+
+// ═════════════════════════════════════════════════════════
+// ADMIN NOTIFICATIONS
+// ═════════════════════════════════════════════════════════
+
+function showNotifications() {
+    hideAllSections();
+    document.getElementById('notificationsSection').style.display = 'block';
+    setActiveTab('notifications');
+    loadRecentNotifications();
+    window.scrollTo(0, 0);
+}
+
+async function sendCustomNotification() {
+    const title = document.getElementById('notifTitle').value.trim();
+    const body = document.getElementById('notifBody').value.trim();
+    const type = document.getElementById('notifType').value;
+
+    if (!title || !body) {
+        showToast('❌ Title and message are required', 'error');
+        return;
+    }
+
+    if (!confirm(`Send "${title}" to ALL users? This cannot be undone.`)) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/notifications/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                body: body,
+                notification_type: type
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to send notification');
+        }
+
+        const data = await response.json();
+        showToast(`✅ Sent to ${data.success_count} users!`, 'success');
+
+        // Clear form
+        document.getElementById('notifTitle').value = '';
+        document.getElementById('notifBody').value = '';
+
+        // Refresh history
+        loadRecentNotifications();
+    } catch (error) {
+        showToast(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function loadRecentNotifications() {
+    const container = document.getElementById('recentNotifsList');
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/notifications/recent`);
+        if (!response.ok) throw new Error('Failed to load');
+        const items = await response.json();
+
+        if (items.length === 0) {
+            container.innerHTML = '<p style="color: #999;">No notifications sent yet.</p>';
+            return;
+        }
+
+        const tableHTML = `
+            <table class="surveys-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Recipients</th>
+                        <th>Sent At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(n => {
+                        const sentAt = new Date(n.created_at).toLocaleString();
+                        const preview = n.body.substring(0, 80) + (n.body.length > 80 ? '...' : '');
+                        return `
+                            <tr>
+                                <td>
+                                    <strong>${n.title}</strong><br>
+                                    <small style="color: #666;">${preview}</small>
+                                </td>
+                                <td><span class="status-active">${n.notification_type}</span></td>
+                                <td>${n.recipient_count}</td>
+                                <td>${sentAt}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+        container.innerHTML = tableHTML;
+    } catch (error) {
+        container.innerHTML = `<p style="color: red;">Error loading history: ${error.message}</p>`;
+    }
 }

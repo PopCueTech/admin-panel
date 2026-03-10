@@ -49,6 +49,7 @@
                     <button class="nav-tab active" onclick="showDashboard()">📊 Dashboard</button>
                     <button class="nav-tab" onclick="showSurveyForm()">➕ Create Survey</button>
                     <button class="nav-tab" onclick="showSurveysList()">📋 View Surveys</button>
+                    <button class="nav-tab" onclick="showNotifications()">🔔 Notifications</button>
                 </div>
                 <div class="nav-right">
                     <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
@@ -166,12 +167,22 @@
 
                 <div class="form-group">
                     <label for="surveyType">Survey Type *</label>
-                    <select id="surveyType" required>
+                    <select id="surveyType" required onchange="onSurveyTypeChange()">
                         <option value="" disabled selected>-- Select Survey Type --</option>
                         <option value="claim_message">Claim / Message Testing</option>
                         <option value="packaging_design">Packaging / Design Testing</option>
                         <option value="concept_test">Concept Testing</option>
                     </select>
+                </div>
+
+                <!-- ss: concept cards for packaging_design / concept_test -->
+                <div id="conceptBuilderSection" style="display:none;">
+                    <div class="form-group">
+                        <label>Concepts to Test *</label>
+                        <small style="color:#9ca3af;display:block;margin-bottom:8px;">Upload each image in Firebase Console → Storage, then paste the URL below.</small>
+                        <div id="conceptCards"></div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addConceptCard()" style="margin-top:8px;">+ Add Concept</button>
+                    </div>
                 </div>
 
                 <div class="form-row">
@@ -284,6 +295,43 @@
                 <div id="noCurveysMessage" style="display: none; text-align: center; padding: 40px;">
                     <p style="color: #999; font-size: 1.1em;">No surveys created yet</p>
                     <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create Your First Survey</button>
+                </div>
+            </div>
+
+            <!-- Notifications Section -->
+            <div id="notificationsSection" style="display: none; padding: 20px;">
+                <h2>Send Notification</h2>
+
+                <div class="details-card" style="max-width: 600px; margin-bottom: 24px;">
+                    <h3>Compose & Send</h3>
+                    <div class="form-group">
+                        <label>Title *</label>
+                        <input type="text" id="notifTitle" class="form-control"
+                            placeholder="e.g. New Feature Alert!" maxlength="255" />
+                    </div>
+                    <div class="form-group">
+                        <label>Message *</label>
+                        <textarea id="notifBody" class="form-control"
+                            placeholder="Write your message here..." rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="notifType" class="form-control">
+                            <option value="announcement">📣 Announcement</option>
+                            <option value="survey_published">📋 Survey Published</option>
+                            <option value="reward_earned">🎁 Reward Earned</option>
+                        </select>
+                    </div>
+                    <div class="button-group" style="margin-top: 16px;">
+                        <button type="button" class="btn btn-primary" onclick="sendCustomNotification()">
+                            📤 Send to All Users
+                        </button>
+                    </div>
+                </div>
+
+                <div class="details-card">
+                    <h3>Recent Broadcasts</h3>
+                    <div id="recentNotifsList"><p style="color:#999;">Loading...</p></div>
                 </div>
             </div>
 
@@ -430,6 +478,70 @@
 
     <!-- Toast Notifications -->
     <div id="toast" class="toast"></div>
+
+
+    <script>
+    // ss: show/hide concept builder based on survey type
+let conceptCounter = 0;
+
+function onSurveyTypeChange() {
+    const surveyType = document.getElementById('surveyType').value;
+    const section = document.getElementById('conceptBuilderSection');
+    const needsConcepts = surveyType === 'packaging_design' || surveyType === 'concept_test';
+    section.style.display = needsConcepts ? 'block' : 'none';
+
+    // Auto-add 2 cards if empty
+    if (needsConcepts && document.getElementById('conceptCards').children.length === 0) {
+        addConceptCard();
+        addConceptCard();
+    }
+}
+
+function addConceptCard() {
+    conceptCounter++;
+    const id = conceptCounter;
+    const cards = document.getElementById('conceptCards');
+    const card = document.createElement('div');
+    card.className = 'concept-card';
+    card.id = `concept-card-${id}`;
+    card.style.cssText = 'border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:10px;background:#f9fafb;';
+    card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>Concept ${cards.children.length + 1}</strong>
+            <button type="button" onclick="removeConceptCard(${id})" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:1.1em;">✕</button>
+        </div>
+        <div style="margin-bottom:8px;">
+            <label style="font-size:0.85rem;">Label *</label>
+            <input type="text" id="concept-label-${id}" placeholder="e.g. Tortilla Chips" style="margin-top:4px;width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:6px;">
+            <label style="font-size:0.85rem;">Firebase Image URL <small style="color:#9ca3af;font-weight:400;">— paste URL from Firebase Storage</small></label>
+            <input type="url" id="concept-imageurl-${id}" placeholder="https://firebasestorage.googleapis.com/..." style="margin-top:4px;width:100%;box-sizing:border-box;" oninput="onConceptUrlInput(${id})" onpaste="setTimeout(()=>onConceptUrlInput(${id}),50)">
+        </div>
+        <img id="concept-preview-${id}" src="" alt="Preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:6px;object-fit:cover;">
+    `;
+    cards.appendChild(card);
+}
+
+function removeConceptCard(id) {
+    const cards = document.getElementById('conceptCards');
+    if (cards.children.length <= 2) { showToast('At least 2 concepts required', 'error'); return; }
+    document.getElementById(`concept-card-${id}`)?.remove();
+}
+
+function onConceptUrlInput(id) {
+    const url = document.getElementById(`concept-imageurl-${id}`)?.value?.trim();
+    const preview = document.getElementById(`concept-preview-${id}`);
+    if (!preview) return;
+    if (url && url.startsWith('http')) {
+        preview.src = url;
+        preview.style.display = 'block';
+        preview.onerror = () => { preview.style.display = 'none'; };
+    } else {
+        preview.style.display = 'none';
+    }
+}
+    </script>
 
     <script src="app.js"></script>
 </body>
