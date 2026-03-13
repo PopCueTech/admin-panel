@@ -179,7 +179,7 @@
                 <div id="conceptBuilderSection" style="display:none;">
                     <div class="form-group">
                         <label>Concepts to Test *</label>
-                        <small style="color:#9ca3af;display:block;margin-bottom:8px;">Upload each image in Firebase Console → Storage, then paste the URL below.</small>
+                        <small style="color:#9ca3af;display:block;margin-bottom:8px;">Upload images directly using the file picker in each concept card.</small>
                         <div id="conceptCards"></div>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="addConceptCard()" style="margin-top:8px;">+ Add Concept</button>
                     </div>
@@ -514,10 +514,15 @@ function addConceptCard() {
             <label style="font-size:0.85rem;">Label *</label>
             <input type="text" id="concept-label-${id}" placeholder="e.g. Tortilla Chips" style="margin-top:4px;width:100%;box-sizing:border-box;">
         </div>
-        <div style="margin-bottom:6px;">
-            <label style="font-size:0.85rem;">Firebase Image URL <small style="color:#9ca3af;font-weight:400;">— paste URL from Firebase Storage</small></label>
-            <input type="url" id="concept-imageurl-${id}" placeholder="https://firebasestorage.googleapis.com/..." style="margin-top:4px;width:100%;box-sizing:border-box;" oninput="onConceptUrlInput(${id})" onpaste="setTimeout(()=>onConceptUrlInput(${id}),50)">
+        <div style="margin-bottom:8px;">
+            <label style="font-size:0.85rem;">Upload Image *</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <input type="file" id="concept-file-${id}" accept="image/*" style="flex:1;font-size:0.85rem;">
+                <button type="button" id="concept-upload-btn-${id}" class="btn btn-sm" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.85rem;" onclick="uploadConceptImage(${id})">Upload</button>
+            </div>
+            <small id="concept-upload-status-${id}" style="color:#666;display:block;margin-top:4px;"></small>
         </div>
+        <input type="hidden" id="concept-imageurl-${id}">
         <img id="concept-preview-${id}" src="" alt="Preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:6px;object-fit:cover;">
     `;
     cards.appendChild(card);
@@ -539,6 +544,64 @@ function onConceptUrlInput(id) {
         preview.onerror = () => { preview.style.display = 'none'; };
     } else {
         preview.style.display = 'none';
+    }
+}
+
+async function uploadConceptImage(id) {
+    const fileInput = document.getElementById(`concept-file-${id}`);
+    const file = fileInput?.files[0];
+    if (!file) {
+        showToast('Please select an image file', 'error');
+        return;
+    }
+
+    const uploadBtn = document.getElementById(`concept-upload-btn-${id}`);
+    const statusEl = document.getElementById(`concept-upload-status-${id}`);
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+    statusEl.textContent = 'Uploading...';
+    statusEl.style.color = '#666';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/upload/image`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Upload failed');
+        }
+
+        const data = await response.json();
+        const imageUrl = data.url;
+
+        // Store URL in hidden field (read by getConceptsFromForm())
+        document.getElementById(`concept-imageurl-${id}`).value = imageUrl;
+
+        // Show preview
+        const preview = document.getElementById(`concept-preview-${id}`);
+        preview.src = imageUrl;
+        preview.style.display = 'block';
+        preview.onerror = () => {
+            statusEl.textContent = 'Preview load failed';
+            statusEl.style.color = '#e74c3c';
+        };
+
+        uploadBtn.textContent = '✓ Uploaded';
+        statusEl.textContent = 'Image uploaded successfully!';
+        statusEl.style.color = '#10b981';
+        showToast('Image uploaded!', 'success');
+    } catch (error) {
+        showToast(`Upload failed: ${error.message}`, 'error');
+        statusEl.textContent = `Error: ${error.message}`;
+        statusEl.style.color = '#e74c3c';
+        uploadBtn.textContent = 'Upload';
+        uploadBtn.disabled = false;
     }
 }
     </script>
