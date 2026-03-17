@@ -965,9 +965,8 @@ body {
     font-size: 13px;
     font-weight: 600;
     color: white;
-    max-width: 800px;
-    margin: 0 auto 0 auto;
-    border-radius: 12px 12px 0 0;
+    width: 100%;
+    border-radius: 0;
 }
 
 .env-prod {
@@ -1027,7 +1026,7 @@ body {
 
 /* When env banner is present, remove top border-radius from container */
 .env-banner + .container {
-    border-radius: 0 0 12px 12px;
+    border-radius: 0;
 }
 
 /* ═════════════════════════════════════════════════════════
