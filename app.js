@@ -14,6 +14,7 @@ let API_BASE_URL = API_URL_PROD;
 let currentUser = null;
 let currentToken = null;
 let currentSurveyData = null;
+let currentSurveyMetrics = null;
 let refreshTimer = null;
 
 // ═════════════════════════════════════════════════════════
@@ -904,16 +905,19 @@ function showSurveyDetails(survey) {
 
 function updateActionButtons(survey) {
     const downloadBtn = document.getElementById('downloadReportBtn');
+    const downloadMetricsBtn = document.getElementById('downloadMetricsBtn');
     const publishBtn = document.getElementById('publishDetailBtn');
     const unpublishBtn = document.getElementById('unpublishDetailBtn');
 
     // Only show download button for published surveys
     if (survey.is_active) {
         downloadBtn.style.display = 'inline-block';
+        downloadMetricsBtn.style.display = 'inline-block';
         publishBtn.style.display = 'none';
         unpublishBtn.style.display = 'inline-block';
     } else {
         downloadBtn.style.display = 'none';
+        downloadMetricsBtn.style.display = 'none';
         publishBtn.style.display = 'inline-block';
         unpublishBtn.style.display = 'none';
     }
@@ -1018,6 +1022,49 @@ async function downloadSurveyReport() {
 }
 
 // ═════════════════════════════════════════════════════════
+// METRICS JSON DOWNLOAD
+// ═════════════════════════════════════════════════════════
+
+async function downloadMetricsJSON() {
+    if (!currentSurveyMetrics || !currentSurveyData) {
+        showToast('No metrics data available', 'error');
+        return;
+    }
+
+    try {
+        // Prepare the JSON data with survey info
+        const jsonData = {
+            survey_id: currentSurveyData.id,
+            survey_title: currentSurveyData.title,
+            survey_description: currentSurveyData.description,
+            exported_at: new Date().toISOString(),
+            metrics: currentSurveyMetrics
+        };
+
+        // Convert to JSON string
+        const jsonString = JSON.stringify(jsonData, null, 2);
+
+        // Create blob and download
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `survey_${currentSurveyData.id}_metrics.json`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        showToast('✅ Metrics JSON downloaded successfully!', 'success');
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('JSON download error:', error);
+    }
+}
+
+// ═════════════════════════════════════════════════════════
 // SURVEY ACTIONS FROM DETAILS
 // ═════════════════════════════════════════════════════════
 
@@ -1102,6 +1149,9 @@ async function loadSurveyMetrics(surveyId) {
 }
 
 function displayMetrics(data) {
+    // Store metrics data for download
+    currentSurveyMetrics = data;
+
     // Response stats
     document.getElementById('metricCompletedSessions').textContent = data.completed_sessions || 0;
     document.getElementById('metricTotalResponses').textContent = data.total_responses || 0;
