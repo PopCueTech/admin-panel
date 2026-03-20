@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('surveyContext').addEventListener('input', (e) => {
-        document.getElementById('contextCount').textContent = `${e.target.value.length}/5000`;
+        document.getElementById('contextCount').textContent = `${e.target.value.length}/50000`;
     });
 
     // Form submission
@@ -742,7 +742,7 @@ function resetForm() {
     document.getElementById('surveyForm').style.display = 'block';
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
-    document.getElementById('contextCount').textContent = '0/5000';
+    document.getElementById('contextCount').textContent = '0/50000';
 }
 
 function copySurveyId() {
@@ -764,7 +764,7 @@ function goToDashboard() {
     document.getElementById('surveyType').value = '';
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
-    document.getElementById('contextCount').textContent = '0/5000';
+    document.getElementById('contextCount').textContent = '0/50000';
 
     // Scroll to top
     window.scrollTo(0, 0);
