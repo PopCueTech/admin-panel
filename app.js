@@ -1246,6 +1246,16 @@ function displayMetrics(data) {
             </div>`
         ).join('') : '';
 
+        const ageBars = demo.age_distribution ? Object.entries(demo.age_distribution).map(([range, stats]) =>
+            `<div class="pick-rate-item">
+                <span class="pick-rate-label">${range}</span>
+                <div class="pick-rate-bar-bg">
+                    <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
+                </div>
+                <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
+            </div>`
+        ).join('') : '';
+
         kpiHTML += `
             <div class="kpi-card kpi-wide">
                 <span class="kpi-icon">👥</span>
@@ -1254,9 +1264,12 @@ function displayMetrics(data) {
                     <div style="margin-bottom: 16px; font-size: 13px;">
                         <span style="font-weight: 500;">Total Respondents:</span> ${demo.respondent_count}
                     </div>
-                    ${demo.avg_age !== null ? `
-                    <div style="margin-bottom: 16px; font-size: 13px;">
-                        <span style="font-weight: 500;">Average Age:</span> ${demo.avg_age} years (${demo.age_known_count} with data)
+                    ${ageBars ? `
+                    <div style="margin-bottom: 16px;">
+                        <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Age Distribution (${demo.age_known_count} with data)</span>
+                        <div class="pick-rates-list">
+                            ${ageBars}
+                        </div>
                     </div>
                     ` : ''}
                     ${genderBars ? `
