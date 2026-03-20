@@ -1407,16 +1407,14 @@ async function backfillDemographics(surveyId, dryRun, mode) {
         document.getElementById('backfillResultsSection').style.display = 'block';
         document.getElementById('backfillResultsContent').textContent = 'Processing...';
 
-        const url = new URL(`${API_BASE}/admin/backfill-demographics`, window.location.origin);
-        url.searchParams.append('dry_run', dryRun);
+        let url = `${API_BASE_URL}/api/v1/admin/backfill-demographics?dry_run=${dryRun}`;
         if (surveyId) {
-            url.searchParams.append('survey_id', surveyId);
+            url += `&survey_id=${surveyId}`;
         }
 
-        const response = await fetch(url, {
+        const response = await fetchWithAuth(url, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${getToken()}`,
                 'Content-Type': 'application/json'
             }
         });
