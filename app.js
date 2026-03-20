@@ -652,6 +652,7 @@ async function generateSurvey() {
     const maxResponses = parseInt(document.getElementById('maxResponses').value) || 100;
     const tenantId = document.getElementById('tenantId').value;
     const surveyType = document.getElementById('surveyType').value;
+    const isMultiConcept = document.querySelector('input[name="conceptType"]:checked').value === 'multi';
 
     if (!name || !description || !context || !tenantId || !surveyType) {
         showToast('Please fill in all required fields', 'error');
@@ -677,6 +678,7 @@ async function generateSurvey() {
                 max_responses: maxResponses,
                 tenant_id: tenantId,
                 test_type: surveyType,
+                is_multi_concept: isMultiConcept,
                 concepts: getConceptsFromForm()  // ss: send concepts with image URLs
             })
         });
