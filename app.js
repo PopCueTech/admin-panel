@@ -1619,3 +1619,129 @@ async function loadRecentNotifications() {
         container.innerHTML = `<p style="color: red;">Error loading history: ${error.message}</p>`;
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// BACKFILL METRICS FUNCTIONS
+// ═══════════════════════════════════════════════════════════
+
+function showBackfillMetrics() {
+    hideAllSections();
+    document.getElementById('backfillMetricsSection').style.display = 'block';
+    setActiveTab('metrics');
+    document.getElementById('backfillMetricsResultsSection').style.display = 'none';
+    window.scrollTo(0, 0);
+}
+
+function updateBackfillMetricsUI() {
+    // Update UI based on selected mode
+    const mode = document.querySelector('input[name="backfillMetricsMode"]:checked').value;
+    const surveyIdInput = document.getElementById('backfillMetricsSurveyId');
+
+    if (mode === 'single') {
+        surveyIdInput.style.display = 'block';
+    } else {
+        surveyIdInput.style.display = 'none';
+    }
+}
+
+function hideBackfillMetricsResults() {
+    document.getElementById('backfillMetricsResultsSection').style.display = 'none';
+}
+
+async function dryRunMetricsSingleSurvey() {
+    const surveyId = document.getElementById('backfillMetricsSurveyId').value.trim();
+    if (!surveyId) {
+        showToast('❌ Please enter a Survey ID', 'error');
+        return;
+    }
+    await backfillMetrics(surveyId, true, 'single');
+}
+
+async function backfillMetricsSingleSurvey() {
+    const surveyId = document.getElementById('backfillMetricsSurveyId').value.trim();
+    if (!surveyId) {
+        showToast('❌ Please enter a Survey ID', 'error');
+        return;
+    }
+    if (!confirm(`Recalculate metrics for survey ${surveyId}? This will recalculate Decision Time and Hesitation using the latest formulas.`)) return;
+    await backfillMetrics(surveyId, false, 'single');
+}
+
+async function dryRunMetricsAllSurveys() {
+    await backfillMetrics(null, true, 'all');
+}
+
+async function backfillMetricsAllSurveys() {
+    if (!confirm('⚠️ Recalculate metrics for ALL surveys? This will process all surveys with completed responses using the latest formulas. Continue?')) return;
+    await backfillMetrics(null, false, 'all');
+}
+
+async function backfillMetrics(surveyId, dryRun, mode) {
+    try {
+        showToast('Processing metrics backfill...', 'info');
+        document.getElementById('backfillMetricsResultsSection').style.display = 'block';
+        document.getElementById('backfillMetricsResultsContent').textContent = 'Processing...';
+
+        let url = `${API_BASE_URL}/api/v1/admin/backfill-metrics?dry_run=${dryRun}`;
+        if (surveyId) {
+            url += `&survey_id=${surveyId}`;
+        }
+
+        const response = await fetchWithAuth(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Format results for display
+        let resultText = `${dryRun ? '🔍 DRY RUN' : '✅ EXECUTED'} - ${result.mode.toUpperCase()} BACKFILL\n`;
+        resultText += `Surveys Processed: ${result.surveys_processed}\n`;
+        resultText += `Dry Run Mode: ${dryRun}\n`;
+        resultText += `\n${'='.repeat(80)}\n\n`;
+
+        if (result.backfill_details && result.backfill_details.length > 0) {
+            result.backfill_details.forEach((detail, idx) => {
+                resultText += `Survey ${idx + 1}/${result.surveys_processed}\n`;
+                resultText += `  Survey ID: ${detail.survey_id}\n`;
+                resultText += `  Title: ${detail.survey_title}\n`;
+                resultText += `  Status: ${detail.status || 'success'}\n`;
+
+                if (detail.completed_sessions !== undefined) {
+                    resultText += `  Completed Sessions: ${detail.completed_sessions}\n`;
+                }
+
+                if (detail.old_metric_count !== undefined && detail.new_metric_count !== undefined) {
+                    resultText += `  Metrics Before: ${detail.old_metric_count}\n`;
+                    resultText += `  Metrics After: ${detail.new_metric_count}\n`;
+                }
+
+                if (detail.error) {
+                    resultText += `  Error: ${detail.error}\n`;
+                }
+
+                resultText += `${'-'.repeat(80)}\n\n`;
+            });
+        }
+
+        document.getElementById('backfillMetricsResultsContent').textContent = resultText;
+
+        if (dryRun) {
+            showToast(`✅ Dry run complete! Reviewed ${result.surveys_processed} survey(s)`, 'success');
+        } else {
+            showToast(`✅ Backfill complete! Updated ${result.surveys_processed} survey(s)`, 'success');
+        }
+
+    } catch (error) {
+        console.error('Metrics backfill error:', error);
+        document.getElementById('backfillMetricsResultsContent').textContent = `ERROR:\n\n${error.message}`;
+        showToast(`❌ Backfill failed: ${error.message}`, 'error');
+    }
+}
