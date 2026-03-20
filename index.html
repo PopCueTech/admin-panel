@@ -50,6 +50,7 @@
                     <button class="nav-tab" onclick="showSurveyForm()">➕ Create Survey</button>
                     <button class="nav-tab" onclick="showSurveysList()">📋 View Surveys</button>
                     <button class="nav-tab" onclick="showNotifications()">🔔 Notifications</button>
+                    <button class="nav-tab" onclick="showBackfillDemographics()">🔄 Backfill Demographics</button>
                 </div>
                 <div class="nav-right">
                     <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
@@ -332,6 +333,73 @@
                 <div class="details-card">
                     <h3>Recent Broadcasts</h3>
                     <div id="recentNotifsList"><p style="color:#999;">Loading...</p></div>
+                </div>
+            </div>
+
+            <!-- Backfill Demographics Section -->
+            <div id="backfillDemographicsSection" style="display: none; padding: 20px;">
+                <h2>Backfill Respondent Demographics</h2>
+                <p style="color: #666; margin-bottom: 20px;">Calculate and backfill gender + age demographic data for surveys. You can backfill a single survey, dry-run to preview changes, or backfill all surveys at once.</p>
+
+                <!-- Mode Selection -->
+                <div class="details-card" style="margin-bottom: 20px;">
+                    <h3>Select Backfill Mode</h3>
+
+                    <!-- Single Survey Mode -->
+                    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h4 style="margin-top: 0; display: flex; align-items: center;">
+                            <input type="radio" name="backfillMode" value="single" onchange="updateBackfillUI()" checked>
+                            <span style="margin-left: 8px;">Single Survey</span>
+                        </h4>
+                        <p style="color: #666; font-size: 13px; margin: 8px 0 12px 0;">Backfill demographic data for one specific survey.</p>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label>Survey ID (UUID)</label>
+                            <input type="text" id="backfillSurveyId" class="form-control" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" />
+                        </div>
+                        <div class="button-group" style="margin-top: 12px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="dryRunSingleSurvey()">👁️ Dry Run</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="backfillSingleSurvey()">⚡ Execute</button>
+                        </div>
+                    </div>
+
+                    <!-- All Surveys Dry Run -->
+                    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h4 style="margin-top: 0; display: flex; align-items: center;">
+                            <input type="radio" name="backfillMode" value="dry-run-all" onchange="updateBackfillUI()">
+                            <span style="margin-left: 8px;">Dry Run All Surveys</span>
+                        </h4>
+                        <p style="color: #666; font-size: 13px; margin: 8px 0 12px 0;">Preview exactly what data would be inserted for all surveys without making any changes.</p>
+                        <div class="button-group">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="dryRunAllSurveys()">👁️ Preview Changes</button>
+                        </div>
+                    </div>
+
+                    <!-- All Surveys Backfill -->
+                    <div style="padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h4 style="margin-top: 0; display: flex; align-items: center;">
+                            <input type="radio" name="backfillMode" value="backfill-all" onchange="updateBackfillUI()">
+                            <span style="margin-left: 8px;">Backfill All Surveys</span>
+                        </h4>
+                        <p style="color: #666; font-size: 13px; margin: 8px 0 12px 0;">Calculate and store demographic data for all surveys with completed responses. ⚠️ This will process all surveys.</p>
+                        <div class="button-group">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="backfillAllSurveys()" style="background-color: #ff9800;">⚡ Execute Backfill</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="backfillResultsSection" style="display: none; margin-top: 20px;">
+                    <div class="details-card">
+                        <h3>Results</h3>
+                        <div style="max-height: 600px; overflow-y: auto;">
+                            <div id="backfillResultsContent" style="font-size: 13px; font-family: monospace; background: #f5f5f5; padding: 12px; border-radius: 4px; white-space: pre-wrap; word-break: break-word;">
+                                Processing...
+                            </div>
+                        </div>
+                        <div class="button-group" style="margin-top: 12px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="hideBackfillResults()">✕ Close</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

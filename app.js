@@ -286,6 +286,7 @@ function hideAllSections() {
     document.getElementById('surveysListSection').style.display = 'none';
     document.getElementById('notificationsSection').style.display = 'none';
     document.getElementById('surveyDetailsSection').style.display = 'none';
+    document.getElementById('backfillDemographicsSection').style.display = 'none';
 }
 
 function setActiveTab(tab) {
@@ -294,6 +295,7 @@ function setActiveTab(tab) {
     if (tab === 'create') document.querySelectorAll('.nav-tab')[1].classList.add('active');
     if (tab === 'list') document.querySelectorAll('.nav-tab')[2].classList.add('active');
     if (tab === 'notifications') document.querySelectorAll('.nav-tab')[3].classList.add('active');
+    if (tab === 'backfill') document.querySelectorAll('.nav-tab')[4].classList.add('active');
 }
 
 async function loadSurveysList() {
@@ -1231,6 +1233,45 @@ function displayMetrics(data) {
         `;
     }
 
+    // Respondent Demographics
+    if (data.respondent_demographics) {
+        const demo = data.respondent_demographics;
+        const genderBars = demo.gender_distribution ? Object.entries(demo.gender_distribution).map(([gender, stats]) =>
+            `<div class="pick-rate-item">
+                <span class="pick-rate-label">${gender.charAt(0).toUpperCase() + gender.slice(1)}</span>
+                <div class="pick-rate-bar-bg">
+                    <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
+                </div>
+                <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
+            </div>`
+        ).join('') : '';
+
+        kpiHTML += `
+            <div class="kpi-card kpi-wide">
+                <span class="kpi-icon">👥</span>
+                <span class="kpi-label">Respondent Demographics</span>
+                <div style="padding: 12px 0;">
+                    <div style="margin-bottom: 16px; font-size: 13px;">
+                        <span style="font-weight: 500;">Total Respondents:</span> ${demo.respondent_count}
+                    </div>
+                    ${demo.avg_age !== null ? `
+                    <div style="margin-bottom: 16px; font-size: 13px;">
+                        <span style="font-weight: 500;">Average Age:</span> ${demo.avg_age} years (${demo.age_known_count} with data)
+                    </div>
+                    ` : ''}
+                    ${genderBars ? `
+                    <div style="margin-top: 12px;">
+                        <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Gender Distribution</span>
+                        <div class="pick-rates-list">
+                            ${genderBars}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
     kpiContainer.innerHTML = kpiHTML || '<p class="no-data">No metrics data yet</p>';
 
     // Question analytics
@@ -1306,6 +1347,127 @@ function showNotifications() {
     setActiveTab('notifications');
     loadRecentNotifications();
     window.scrollTo(0, 0);
+}
+
+function showBackfillDemographics() {
+    hideAllSections();
+    document.getElementById('backfillDemographicsSection').style.display = 'block';
+    setActiveTab('backfill');
+    document.getElementById('backfillResultsSection').style.display = 'none';
+    window.scrollTo(0, 0);
+}
+
+function updateBackfillUI() {
+    // Update UI based on selected mode
+    const mode = document.querySelector('input[name="backfillMode"]:checked').value;
+    const surveyIdInput = document.getElementById('backfillSurveyId');
+
+    if (mode === 'single') {
+        surveyIdInput.style.display = 'block';
+    } else {
+        surveyIdInput.style.display = 'none';
+    }
+}
+
+function hideBackfillResults() {
+    document.getElementById('backfillResultsSection').style.display = 'none';
+}
+
+async function dryRunSingleSurvey() {
+    const surveyId = document.getElementById('backfillSurveyId').value.trim();
+    if (!surveyId) {
+        showToast('❌ Please enter a Survey ID', 'error');
+        return;
+    }
+    await backfillDemographics(surveyId, true, 'single');
+}
+
+async function backfillSingleSurvey() {
+    const surveyId = document.getElementById('backfillSurveyId').value.trim();
+    if (!surveyId) {
+        showToast('❌ Please enter a Survey ID', 'error');
+        return;
+    }
+    if (!confirm(`Backfill demographics for survey ${surveyId}? This will recalculate and update demographic data.`)) return;
+    await backfillDemographics(surveyId, false, 'single');
+}
+
+async function dryRunAllSurveys() {
+    await backfillDemographics(null, true, 'all');
+}
+
+async function backfillAllSurveys() {
+    if (!confirm('⚠️ Backfill demographics for ALL surveys? This will process all surveys with completed responses. Continue?')) return;
+    await backfillDemographics(null, false, 'all');
+}
+
+async function backfillDemographics(surveyId, dryRun, mode) {
+    try {
+        showToast('Processing backfill...', 'info');
+        document.getElementById('backfillResultsSection').style.display = 'block';
+        document.getElementById('backfillResultsContent').textContent = 'Processing...';
+
+        const url = new URL(`${API_BASE}/admin/backfill-demographics`, window.location.origin);
+        url.searchParams.append('dry_run', dryRun);
+        if (surveyId) {
+            url.searchParams.append('survey_id', surveyId);
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Format results for display
+        let resultText = `${dryRun ? '🔍 DRY RUN' : '✅ EXECUTED'} - ${result.mode.toUpperCase()} BACKFILL\n`;
+        resultText += `Surveys Processed: ${result.surveys_processed}\n`;
+        resultText += `Dry Run Mode: ${dryRun}\n`;
+        resultText += `\n${'='.repeat(80)}\n\n`;
+
+        if (result.backfill_details && result.backfill_details.length > 0) {
+            result.backfill_details.forEach((detail, idx) => {
+                resultText += `Survey ${idx + 1}/${result.surveys_processed}\n`;
+                resultText += `  Survey ID: ${detail.survey_id}\n`;
+                resultText += `  Title: ${detail.survey_title}\n`;
+                resultText += `  Changed: ${detail.changed ? 'YES' : 'NO'}\n\n`;
+
+                if (detail.before) {
+                    resultText += `  BEFORE (Old Demographics):\n`;
+                    resultText += `${JSON.stringify(detail.before, null, 4).split('\n').map(l => '    ' + l).join('\n')}\n\n`;
+                }
+
+                if (detail.after) {
+                    resultText += `  AFTER (New Demographics):\n`;
+                    resultText += `${JSON.stringify(detail.after, null, 4).split('\n').map(l => '    ' + l).join('\n')}\n\n`;
+                }
+
+                resultText += `${'-'.repeat(80)}\n\n`;
+            });
+        }
+
+        document.getElementById('backfillResultsContent').textContent = resultText;
+
+        if (dryRun) {
+            showToast(`✅ Dry run complete! Reviewed ${result.surveys_processed} survey(s)`, 'success');
+        } else {
+            showToast(`✅ Backfill complete! Updated ${result.surveys_processed} survey(s)`, 'success');
+        }
+
+    } catch (error) {
+        console.error('Backfill error:', error);
+        document.getElementById('backfillResultsContent').textContent = `ERROR:\n\n${error.message}`;
+        showToast(`❌ Backfill failed: ${error.message}`, 'error');
+    }
 }
 
 async function sendCustomNotification() {
