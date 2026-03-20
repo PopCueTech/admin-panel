@@ -198,7 +198,11 @@ body {
     color: var(--text-color);
 }
 
-.form-group input,
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group input[type="file"],
 .form-group textarea,
 .form-group select {
     width: 100%;
@@ -208,6 +212,14 @@ body {
     font-size: 1em;
     font-family: inherit;
     transition: all 0.3s ease;
+}
+
+.form-group input[type="radio"],
+.form-group input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+    border: none;
+    margin-right: 8px;
 }
 
 .form-group input:focus,
