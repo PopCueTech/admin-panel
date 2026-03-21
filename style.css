@@ -1045,6 +1045,12 @@ body {
    METRICS DISPLAY
    ═════════════════════════════════════════════════════════ */
 
+.metrics-overview {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
 .metrics-summary {
     display: flex;
     gap: 16px;
@@ -1059,6 +1065,7 @@ body {
     background: #f8fafc;
     border-radius: 8px;
     border: 1px solid var(--border-color);
+    border-left: 3px solid var(--primary-color);
     overflow: hidden;
     word-wrap: break-word;
 }
@@ -1324,4 +1331,214 @@ body {
 
 .concept-winner .concept-value {
     color: var(--success-color);
+}
+
+/* New concept card layout (scrollable horizontal) */
+.concept-cards {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+}
+
+.concept-card {
+    min-width: 160px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    background: #f8fafc;
+}
+
+.concept-card--winner {
+    border-top: 3px solid var(--success-color);
+    background: #f0fdf4;
+}
+
+.concept-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.concept-metric-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 8px;
+}
+
+.concept-metric-row:last-child {
+    margin-bottom: 0;
+}
+
+.concept-metric-row-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.concept-metric-row-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.concept-metric-row-value {
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+/* Metrics sections */
+.metrics-section {
+    margin-bottom: 24px;
+}
+
+.metrics-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 12px;
+}
+
+/* Question analytics */
+.qa-card {
+    padding: 14px;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.qa-card:last-child {
+    margin-bottom: 0;
+}
+
+.qa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.qa-question-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    flex: 1;
+}
+
+.qa-type-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.qa-response-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #475569;
+}
+
+.qa-slider-row,
+.qa-option-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.qa-slider-row:last-child,
+.qa-option-row:last-child {
+    margin-bottom: 0;
+}
+
+.qa-row-label {
+    min-width: 90px;
+    flex-shrink: 0;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.qa-row-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.qa-row-bar {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.qa-row-value {
+    min-width: 45px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.qa-rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.qa-rank-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #475569;
+}
+
+.qa-rank-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-color);
+}
+
+.qa-text-note {
+    padding: 8px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-style: italic;
+    color: #64748b;
+    font-size: 12px;
 }

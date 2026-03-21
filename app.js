@@ -1150,6 +1150,16 @@ async function loadSurveyMetrics(surveyId) {
     }
 }
 
+function parseRankingKey(keyStr) {
+    // Extract 'id' from strings like "{'id': 'price', 'rank': 1}"
+    try {
+        const match = keyStr.match(/'id':\s*'([^']+)'/);
+        return match ? match[1] : keyStr;
+    } catch {
+        return keyStr;
+    }
+}
+
 function displayMetrics(data) {
     // Store metrics data for download
     currentSurveyMetrics = data;
@@ -1173,23 +1183,15 @@ function displayMetrics(data) {
 
     let kpiHTML = '';
 
-    // Multi-concept comparison section
+    // ─── CONCEPT COMPARISON (scrollable card layout) ───
     if (isMultiConcept && Object.keys(concepts).length > 0) {
         const conceptMetricLabels = {
-            purchase_intent: { label: 'Purchase Intent', icon: '🛒', unit: '%', scale: 100 },
-            repeat_intent: { label: 'Repeat Intent', icon: '🔄', unit: '%', scale: 100 },
-            appeal: { label: 'Appeal', icon: '❤️', unit: '/100', scale: 100 },
+            purchase_intent: { label: 'Purchase Intent', icon: '🛒' },
+            repeat_intent: { label: 'Repeat Intent', icon: '🔄' },
+            appeal: { label: 'Appeal', icon: '❤️' },
+            decision_time: { label: 'Decision Time', icon: '⏱️' },
+            hesitation_rate: { label: 'Hesitation Rate', icon: '🤔' },
         };
-
-        kpiHTML += `<div class="concept-comparison">
-            <h4>Concept Comparison</h4>
-            <div class="concept-table">
-                <div class="concept-header-row">
-                    <div class="concept-metric-label">Metric</div>
-                    ${Object.entries(concepts).map(([id, c]) =>
-                        `<div class="concept-col-header">${c.label || id}</div>`
-                    ).join('')}
-                </div>`;
 
         // Collect all metric keys across concepts (excluding "label")
         const allMetricKeys = new Set();
@@ -1199,34 +1201,53 @@ function displayMetrics(data) {
             }
         }
 
-        for (const metricKey of allMetricKeys) {
-            const info = conceptMetricLabels[metricKey] || { label: formatMetricLabel(metricKey), icon: '📊', unit: '', scale: 100 };
-            const conceptEntries = Object.entries(concepts);
-            const values = conceptEntries.map(([, c]) => c[metricKey]).filter(v => v != null);
-            const maxVal = values.length > 0 ? Math.max(...values) : 100;
+        const sortedMetricKeys = Array.from(allMetricKeys);
 
-            kpiHTML += `
-                <div class="concept-row">
-                    <div class="concept-metric-label">${info.icon} ${info.label}</div>
-                    ${conceptEntries.map(([id, c]) => {
-                        const val = c[metricKey];
-                        if (val == null) return `<div class="concept-cell">-</div>`;
-                        const barWidth = maxVal > 0 ? (val / info.scale) * 100 : 0;
-                        const isTop = val === maxVal && values.length > 1;
-                        return `<div class="concept-cell ${isTop ? 'concept-winner' : ''}">
-                            <div class="concept-bar-bg">
-                                <div class="concept-bar" style="width: ${Math.min(barWidth, 100)}%"></div>
-                            </div>
-                            <span class="concept-value">${val.toFixed(1)}${info.unit}</span>
-                        </div>`;
-                    }).join('')}
+        kpiHTML += `<div class="metrics-section">
+            <div class="metrics-section-title">Concept Comparison</div>
+            <div class="concept-cards">`;
+
+        for (const [cId, concept] of Object.entries(concepts)) {
+            const conceptLabel = concept.label || cId;
+
+            // Find max value for each metric to determine winner
+            const metricsForWinner = {};
+            for (const mKey of sortedMetricKeys) {
+                const values = Object.entries(concepts)
+                    .map(([, c]) => c[mKey])
+                    .filter(v => v != null);
+                metricsForWinner[mKey] = values.length > 0 ? Math.max(...values) : null;
+            }
+
+            const isWinner = sortedMetricKeys.some(key => {
+                const val = concept[key];
+                return val !== null && val !== undefined && val === metricsForWinner[key];
+            });
+
+            kpiHTML += `<div class="concept-card ${isWinner ? 'concept-card--winner' : ''}">
+                <div class="concept-card-title">${conceptLabel}</div>`;
+
+            for (const mKey of sortedMetricKeys) {
+                const val = concept[mKey];
+                if (val === null || val === undefined) continue;
+
+                const info = conceptMetricLabels[mKey] || { label: formatMetricLabel(mKey), icon: '📊' };
+                const displayVal = typeof val === 'number' ? val.toFixed(1) : val;
+
+                kpiHTML += `<div class="concept-metric-row">
+                    <span class="concept-metric-row-icon">${info.icon}</span>
+                    <span class="concept-metric-row-label">${info.label}</span>
+                    <span class="concept-metric-row-value">${displayVal}</span>
                 </div>`;
+            }
+
+            kpiHTML += `</div>`;
         }
 
         kpiHTML += `</div></div>`;
     }
 
-    // Display each metric as a card (shared/non-concept metrics)
+    // ─── SHARED KPI METRICS (smaller cards) ───
     const metricLabels = {
         purchase_intent_percent: { label: 'Purchase Intent', unit: '%', icon: '🛒' },
         clarity_score: { label: 'Clarity Score', unit: '/5', icon: '💡' },
@@ -1240,8 +1261,8 @@ function displayMetrics(data) {
         hesitation_rate_percent: { label: 'Hesitation Rate', unit: '%', icon: '🤔' },
     };
 
-    // Track which decision_time key we show (prefer median_ms if present)
     let shownDecisionTime = false;
+    const kpiCards = [];
 
     for (const [key, value] of Object.entries(metrics)) {
         if (key === 'pick_rates' || key === 'attribute_drivers') continue;
@@ -1255,121 +1276,182 @@ function displayMetrics(data) {
         const info = metricLabels[key] || { label: formatMetricLabel(key), unit: '', icon: '📊' };
         const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
 
-        kpiHTML += `
+        kpiCards.push(`
             <div class="kpi-card">
                 <span class="kpi-icon">${info.icon}</span>
                 <span class="kpi-value">${displayValue}${info.unit}</span>
                 <span class="kpi-label">${info.label}</span>
             </div>
-        `;
+        `);
     }
 
-    // Pick rates
+    if (kpiCards.length > 0) {
+        kpiHTML += kpiCards.join('');
+    }
+
+    // ─── PICK RATES ───
     if (metrics.pick_rates && Object.keys(metrics.pick_rates).length > 0) {
         kpiHTML += `
             <div class="kpi-card kpi-wide">
                 <span class="kpi-icon">🎯</span>
                 <span class="kpi-label">Pick Rates</span>
                 <div class="pick-rates-list">
-                    ${Object.entries(metrics.pick_rates).map(([option, pct]) =>
-                        `<div class="pick-rate-item">
-                            <span class="pick-rate-label">${option}</span>
+                    ${Object.entries(metrics.pick_rates).map(([option, pct]) => {
+                        const conceptLabel = concepts[option]?.label || option;
+                        return `<div class="pick-rate-item">
+                            <span class="pick-rate-label">${conceptLabel}</span>
                             <div class="pick-rate-bar-bg">
                                 <div class="pick-rate-bar" style="width: ${pct}%"></div>
                             </div>
                             <span class="pick-rate-value">${pct.toFixed(1)}%</span>
-                        </div>`
-                    ).join('')}
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>
         `;
     }
 
-    // Respondent Demographics
+    // ─── RESPONDENT DEMOGRAPHICS ───
     if (data.respondent_demographics) {
         const demo = data.respondent_demographics;
-        const genderBars = demo.gender_distribution ? Object.entries(demo.gender_distribution).map(([gender, stats]) =>
-            `<div class="pick-rate-item">
-                <span class="pick-rate-label">${gender.charAt(0).toUpperCase() + gender.slice(1)}</span>
-                <div class="pick-rate-bar-bg">
-                    <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
-                </div>
-                <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
-            </div>`
-        ).join('') : '';
+        const hasAge = demo.age_known_count > 0;
+        const hasGender = demo.respondent_count > 0;
 
-        const ageBars = demo.age_distribution ? Object.entries(demo.age_distribution).map(([range, stats]) =>
-            `<div class="pick-rate-item">
-                <span class="pick-rate-label">${range}</span>
-                <div class="pick-rate-bar-bg">
-                    <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
-                </div>
-                <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
-            </div>`
-        ).join('') : '';
+        if (hasAge || hasGender) {
+            const genderBars = demo.gender_distribution ? Object.entries(demo.gender_distribution)
+                .filter(([, stats]) => stats.count > 0)
+                .map(([gender, stats]) =>
+                    `<div class="pick-rate-item">
+                        <span class="pick-rate-label">${gender.charAt(0).toUpperCase() + gender.slice(1)}</span>
+                        <div class="pick-rate-bar-bg">
+                            <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
+                        </div>
+                        <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
+                    </div>`
+                ).join('') : '';
 
-        kpiHTML += `
-            <div class="kpi-card kpi-wide">
-                <span class="kpi-icon">👥</span>
-                <span class="kpi-label">Respondent Demographics</span>
-                <div style="padding: 12px 0;">
-                    <div style="margin-bottom: 16px; font-size: 13px;">
-                        <span style="font-weight: 500;">Total Respondents:</span> ${demo.respondent_count}
-                    </div>
-                    ${ageBars ? `
-                    <div style="margin-bottom: 16px;">
-                        <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Age Distribution (${demo.age_known_count} with data)</span>
-                        <div class="pick-rates-list">
-                            ${ageBars}
+            const ageBars = demo.age_distribution ? Object.entries(demo.age_distribution)
+                .filter(([, stats]) => stats.count > 0)
+                .map(([range, stats]) =>
+                    `<div class="pick-rate-item">
+                        <span class="pick-rate-label">${range}</span>
+                        <div class="pick-rate-bar-bg">
+                            <div class="pick-rate-bar" style="width: ${stats.percent}%"></div>
                         </div>
-                    </div>
-                    ` : ''}
-                    ${genderBars ? `
-                    <div style="margin-top: 12px;">
-                        <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Gender Distribution</span>
-                        <div class="pick-rates-list">
-                            ${genderBars}
+                        <span class="pick-rate-value">${stats.percent.toFixed(1)}% (n=${stats.count})</span>
+                    </div>`
+                ).join('') : '';
+
+            kpiHTML += `
+                <div class="kpi-card kpi-wide">
+                    <span class="kpi-icon">👥</span>
+                    <span class="kpi-label">Respondent Demographics</span>
+                    <div style="padding: 12px 0;">
+                        <div style="margin-bottom: 16px; font-size: 13px;">
+                            <span style="font-weight: 500;">Total Respondents:</span> ${demo.respondent_count}
                         </div>
+                        ${hasAge ? `
+                        <div style="margin-bottom: 16px;">
+                            <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Age Distribution (${demo.age_known_count} with data)</span>
+                            <div class="pick-rates-list">
+                                ${ageBars}
+                            </div>
+                        </div>
+                        ` : ''}
+                        ${hasGender ? `
+                        <div style="margin-top: 12px;">
+                            <span style="font-weight: 500; font-size: 13px; display: block; margin-bottom: 8px;">Gender Distribution</span>
+                            <div class="pick-rates-list">
+                                ${genderBars}
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
-                    ` : ''}
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
 
     kpiContainer.innerHTML = kpiHTML || '<p class="no-data">No metrics data yet</p>';
 
-    // Question analytics
+    // ─── QUESTION ANALYTICS ───
     const qaSection = document.getElementById('questionAnalyticsSection');
-    const qaList = document.getElementById('questionAnalyticsList');
 
     if (data.question_analytics && data.question_analytics.length > 0) {
-        qaSection.style.display = 'block';
-        qaList.innerHTML = data.question_analytics.map(qa => `
-            <div class="qa-item">
+        let qaHTML = `<div class="metrics-section-title">Question Analytics</div>`;
+
+        for (const qa of data.question_analytics) {
+            const questionText = qa.question_text || qa.question_id;
+            const totalResponses = qa.total_responses || 0;
+
+            qaHTML += `<div class="qa-card">
                 <div class="qa-header">
-                    <strong>${qa.question_id}</strong>
-                    <span class="question-type">${qa.question_type || ''}</span>
-                </div>
-                <div class="qa-stats">
-                    ${qa.mean !== undefined && qa.mean !== null ?
-                        `<span>Mean: <strong>${qa.mean.toFixed(2)}</strong></span>` : ''}
-                    ${qa.median !== undefined && qa.median !== null ?
-                        `<span>Median: <strong>${qa.median.toFixed(2)}</strong></span>` : ''}
-                    ${qa.response_count !== undefined ?
-                        `<span>Responses: <strong>${qa.response_count}</strong></span>` : ''}
-                    ${qa.top_box_percent !== undefined && qa.top_box_percent !== null ?
-                        `<span>Top Box: <strong>${qa.top_box_percent.toFixed(1)}%</strong></span>` : ''}
-                </div>
-                ${qa.distribution ? `
-                    <div class="qa-distribution">
-                        ${Object.entries(qa.distribution).map(([val, count]) =>
-                            `<span class="dist-item">${val}: ${count}</span>`
-                        ).join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
+                    <span class="qa-question-text">${questionText}</span>
+                    <span class="qa-type-badge">${qa.question_type || 'unknown'}</span>
+                    <span class="qa-response-badge">n=${totalResponses}</span>
+                </div>`;
+
+            // Render based on question type
+            if (qa.question_type === 'multi_slider' && qa.analytics?.sliders) {
+                qaHTML += `<div>`;
+                for (const [sliderId, slider] of Object.entries(qa.analytics.sliders)) {
+                    const label = slider.label || sliderId;
+                    const mean = slider.mean || 0;
+                    const barWidth = Math.min((mean / 100) * 100, 100);
+                    qaHTML += `
+                        <div class="qa-slider-row">
+                            <span class="qa-row-label">${label}</span>
+                            <div class="qa-row-bar-bg">
+                                <div class="qa-row-bar" style="width: ${barWidth}%"></div>
+                            </div>
+                            <span class="qa-row-value">${mean.toFixed(1)}</span>
+                        </div>`;
+                }
+                qaHTML += `</div>`;
+            } else if (qa.question_type === 'mcq' && qa.analytics?.options) {
+                qaHTML += `<div>`;
+                for (const [optId, opt] of Object.entries(qa.analytics.options)) {
+                    const label = opt.label || optId;
+                    const percent = opt.percent || 0;
+                    const count = opt.count || 0;
+                    qaHTML += `
+                        <div class="qa-option-row">
+                            <span class="qa-row-label">${label}</span>
+                            <div class="qa-row-bar-bg">
+                                <div class="qa-row-bar" style="width: ${percent}%"></div>
+                            </div>
+                            <span class="qa-row-value">${percent.toFixed(1)}% (n=${count})</span>
+                        </div>`;
+                }
+                qaHTML += `</div>`;
+            } else if (qa.question_type === 'ranking' && qa.analytics?.items) {
+                const rankingItems = Object.entries(qa.analytics.items)
+                    .map(([key, item]) => ({
+                        id: parseRankingKey(key),
+                        label: item.label || parseRankingKey(key),
+                        avgRank: item.avg_rank || 0
+                    }))
+                    .sort((a, b) => a.avgRank - b.avgRank);
+
+                qaHTML += `<div class="qa-rank-list">`;
+                rankingItems.forEach((item, idx) => {
+                    qaHTML += `
+                        <div class="qa-rank-item">
+                            <span class="qa-rank-number">${idx + 1}</span>
+                            <span class="qa-row-label">${item.label}</span>
+                        </div>`;
+                });
+                qaHTML += `</div>`;
+            } else if (qa.question_type === 'text') {
+                const responseCount = qa.analytics?.response_count || 0;
+                qaHTML += `<div class="qa-text-note">📝 ${responseCount} open-ended response${responseCount !== 1 ? 's' : ''} (not displayed)</div>`;
+            }
+
+            qaHTML += `</div>`;
+        }
+
+        qaSection.innerHTML = qaHTML;
+        qaSection.style.display = 'block';
     } else {
         qaSection.style.display = 'none';
     }
