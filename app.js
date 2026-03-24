@@ -288,6 +288,8 @@ function hideAllSections() {
     document.getElementById('notificationsSection').style.display = 'none';
     document.getElementById('surveyDetailsSection').style.display = 'none';
     document.getElementById('backfillDemographicsSection').style.display = 'none';
+    document.getElementById('backfillMetricsSection').style.display = 'none';
+    document.getElementById('emailBroadcastSection').style.display = 'none';
 }
 
 function setActiveTab(tab) {
@@ -297,6 +299,8 @@ function setActiveTab(tab) {
     if (tab === 'list') document.querySelectorAll('.nav-tab')[2].classList.add('active');
     if (tab === 'notifications') document.querySelectorAll('.nav-tab')[3].classList.add('active');
     if (tab === 'backfill') document.querySelectorAll('.nav-tab')[4].classList.add('active');
+    if (tab === 'metrics') document.querySelectorAll('.nav-tab')[5].classList.add('active');
+    if (tab === 'email') document.querySelectorAll('.nav-tab')[6].classList.add('active');
 }
 
 async function loadSurveysList() {
@@ -1827,5 +1831,107 @@ async function backfillMetrics(surveyId, dryRun, mode) {
         console.error('Metrics backfill error:', error);
         document.getElementById('backfillMetricsResultsContent').textContent = `ERROR:\n\n${error.message}`;
         showToast(`❌ Backfill failed: ${error.message}`, 'error');
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// EMAIL BROADCAST
+// ═════════════════════════════════════════════════════════════════
+
+function showEmailBroadcast() {
+    hideAllSections();
+    document.getElementById('emailBroadcastSection').style.display = 'block';
+    setActiveTab('email');
+    loadEmailBroadcastHistory();
+    window.scrollTo(0, 0);
+}
+
+async function sendEmailBroadcast() {
+    const subject = document.getElementById('broadcastSubject').value.trim();
+    const bodyHtml = document.getElementById('broadcastBody').value.trim();
+    const bodyText = document.getElementById('broadcastBodyText').value.trim() || null;
+    const filter = document.getElementById('broadcastFilter').value;
+
+    if (!subject || !bodyHtml) {
+        showToast('❌ Subject and message body are required', 'error');
+        return;
+    }
+
+    const filterLabel = filter === 'verified' ? 'verified users' : 'all active users';
+    if (!confirm(`Send "${subject}" to ALL ${filterLabel}? This cannot be undone.`)) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/email/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subject: subject,
+                body_html: bodyHtml,
+                body_text: bodyText,
+                recipient_filter: filter
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to queue email broadcast');
+        }
+
+        const data = await response.json();
+        showToast(`✅ Email broadcast queued for ${data.total_recipients} recipients!`, 'success');
+
+        // Clear form
+        document.getElementById('broadcastSubject').value = '';
+        document.getElementById('broadcastBody').value = '';
+        document.getElementById('broadcastBodyText').value = '';
+
+        // Refresh history after a short delay to let background task update status
+        setTimeout(() => loadEmailBroadcastHistory(), 2000);
+    } catch (error) {
+        showToast(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function loadEmailBroadcastHistory() {
+    const container = document.getElementById('emailBroadcastHistoryList');
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/email/broadcasts`);
+        if (!response.ok) throw new Error('Failed to load broadcast history');
+        const items = await response.json();
+
+        if (items.length === 0) {
+            container.innerHTML = '<p style="color: #999;">No broadcasts sent yet.</p>';
+            return;
+        }
+
+        const tableHTML = `
+            <table class="surveys-table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Filter</th>
+                        <th>Status</th>
+                        <th>Sent / Failed</th>
+                        <th>Initiated By</th>
+                        <th>Sent At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => `
+                        <tr>
+                            <td>${item.subject}</td>
+                            <td>${item.recipient_filter}</td>
+                            <td><span style="color: ${item.status === 'completed' ? '#2e7d32' : item.status === 'failed' ? '#c62828' : '#f57c00'}; font-weight: 600;">${item.status}</span></td>
+                            <td>${item.sent_count} / ${item.failed_count}</td>
+                            <td style="font-size: 12px; color: #666;">${item.initiated_by}</td>
+                            <td style="font-size: 12px;">${new Date(item.created_at).toLocaleString()}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        container.innerHTML = tableHTML;
+    } catch (error) {
+        container.innerHTML = `<p style="color: #c00;">Failed to load history: ${error.message}</p>`;
     }
 }

@@ -52,6 +52,7 @@
                     <button class="nav-tab" onclick="showNotifications()">🔔 Notifications</button>
                     <button class="nav-tab" onclick="showBackfillDemographics()">🔄 Backfill Demographics</button>
                     <button class="nav-tab" onclick="showBackfillMetrics()">📊 Backfill Metrics</button>
+                    <button class="nav-tab" onclick="showEmailBroadcast()">📧 Email Broadcast</button>
                 </div>
                 <div class="nav-right">
                     <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
@@ -483,6 +484,48 @@
                             <button type="button" class="btn btn-secondary btn-sm" onclick="hideBackfillMetricsResults()">✕ Close</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Email Broadcast Section -->
+            <div id="emailBroadcastSection" style="display: none; padding: 20px;">
+                <h2>Email Broadcast</h2>
+                <p style="color: #666; margin-bottom: 20px;">Send a custom email to all active users. The email is sent in the background — you'll see results in the history table below.</p>
+
+                <div class="details-card" style="max-width: 700px; margin-bottom: 24px;">
+                    <h3>Compose Email</h3>
+                    <div class="form-group">
+                        <label>Subject *</label>
+                        <input type="text" id="broadcastSubject" class="form-control"
+                            placeholder="e.g. Exciting New Features in PopCue!" maxlength="500" />
+                    </div>
+                    <div class="form-group">
+                        <label>Recipients</label>
+                        <select id="broadcastFilter" class="form-control">
+                            <option value="verified">Verified users only (recommended)</option>
+                            <option value="all_active">All active users</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Body (HTML allowed) *</label>
+                        <textarea id="broadcastBody" class="form-control"
+                            placeholder="Write your message here. HTML is supported, e.g. &lt;b&gt;bold&lt;/b&gt;, &lt;a href=&quot;...&quot;&gt;links&lt;/a&gt;." rows="8"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Plain Text Fallback (optional)</label>
+                        <textarea id="broadcastBodyText" class="form-control"
+                            placeholder="Plain text version for email clients that don't support HTML..." rows="4"></textarea>
+                    </div>
+                    <div class="button-group" style="margin-top: 16px;">
+                        <button type="button" class="btn btn-primary" onclick="sendEmailBroadcast()">
+                            📧 Send Email Broadcast
+                        </button>
+                    </div>
+                </div>
+
+                <div class="details-card">
+                    <h3>Broadcast History</h3>
+                    <div id="emailBroadcastHistoryList"><p style="color:#999;">Loading...</p></div>
                 </div>
             </div>
 
