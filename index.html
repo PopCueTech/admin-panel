@@ -5,59 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PopCue AI Survey Generator</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="auth.css">
 </head>
 <body>
-    <!-- Environment Switcher Banner -->
-    <div id="envBanner" class="env-banner env-prod">
-        <div class="env-banner-content">
-            <span id="envLabel" class="env-label">PRODUCTION</span>
-            <span id="envUrl" class="env-url"></span>
-        </div>
-        <div class="env-toggle">
-            <button id="envProdBtn" class="env-btn env-btn-active" onclick="switchEnvironment('prod')">PROD</button>
-            <button id="envDevBtn" class="env-btn" onclick="switchEnvironment('dev')">DEV</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🤖 PopCue AI Survey Generator</h1>
-            <p>Generate surveys automatically using AI</p>
-        </div>
-
-        <!-- Auth Section -->
-        <div id="authSection" class="auth-section">
-            <h2>Login</h2>
+    <!-- Auth Screen -->
+    <div id="authSection">
+        <div class="auth-section">
+            <div class="auth-section-logo">
+                <div class="auth-section-logo-mark">PC</div>
+                <span class="auth-section-logo-name">PopCue</span>
+            </div>
+            <h2>Sign in</h2>
+            <p class="auth-section-subtitle">Admin panel — enter your credentials to continue</p>
             <div class="form-group">
-                <label for="authEmail">Email:</label>
+                <label for="authEmail">Email</label>
                 <input type="email" id="authEmail" placeholder="your@email.com" required>
             </div>
             <div class="form-group">
-                <label for="authPassword">Password:</label>
+                <label for="authPassword">Password</label>
                 <input type="password" id="authPassword" placeholder="Your password" required>
             </div>
-            <button id="loginBtn" class="btn btn-primary" onclick="login()">Login</button>
-            <p class="auth-hint">Or use your PopCue account credentials</p>
-        </div>
-
-        <!-- Main Panel (hidden until logged in) -->
-        <div id="mainPanel" class="main-panel" style="display: none;">
-            <!-- Navigation Bar -->
-            <div class="navbar">
-                <div class="nav-left">
-                    <button class="nav-tab active" onclick="showDashboard()">📊 Dashboard</button>
-                    <button class="nav-tab" onclick="showSurveyForm()">➕ Create Survey</button>
-                    <button class="nav-tab" onclick="showSurveysList()">📋 View Surveys</button>
-                    <button class="nav-tab" onclick="showNotifications()">🔔 Notifications</button>
-                    <button class="nav-tab" onclick="showBackfillDemographics()">🔄 Backfill Demographics</button>
-                    <button class="nav-tab" onclick="showBackfillMetrics()">📊 Backfill Metrics</button>
-                    <button class="nav-tab" onclick="showEmailBroadcast()">📧 Email Broadcast</button>
-                </div>
-                <div class="nav-right">
-                    <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+            <button id="loginBtn" class="btn btn-primary" onclick="login()" style="width: 100%; margin-top: 4px;">Sign in</button>
+            <p class="auth-hint" style="margin-top: 16px;">Use your PopCue account credentials</p>
+            <div class="auth-env-toggle">
+                <span class="auth-env-label">Environment</span>
+                <div class="env-toggle">
+                    <button class="env-btn active" data-env="prod" onclick="switchEnvironment('prod')">Production</button>
+                    <button class="env-btn" data-env="dev" onclick="switchEnvironment('dev')">Dev</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- App Shell (shown after login) -->
+    <div id="app" style="display: none;">
+
+        <!-- Sidebar -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">PC</div>
+                <span class="sidebar-title">PopCue</span>
+            </div>
+            <div class="sidebar-env">
+                <div class="env-toggle">
+                    <button class="env-btn active" data-env="prod">Production</button>
+                    <button class="env-btn" data-env="dev">Dev</button>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-group">
+                    <div class="nav-group-label">Analytics</div>
+                    <div class="nav-item active" data-section="dashboard">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+                        Dashboard
+                    </div>
+                    <div class="nav-item" data-section="surveys">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Surveys
+                    </div>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Campaigns</div>
+                    <div class="nav-item" data-section="create">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5v6M5 8h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Create survey
+                    </div>
+                    <div class="nav-item" data-section="notifications">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6a4 4 0 018 0c0 2 1 3 1.5 4H2.5C3 9 4 8 4 6z" stroke="currentColor" stroke-width="1.2"/><path d="M6 10v1a2 2 0 004 0v-1" stroke="currentColor" stroke-width="1.2"/></svg>
+                        Notifications
+                    </div>
+                    <div class="nav-item" data-section="email">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 4.5L8 9l6.5-4.5" stroke="currentColor" stroke-width="1.2"/></svg>
+                        Email broadcast
+                    </div>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">Utilities</div>
+                    <div class="nav-item" data-section="backfill-demographics">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 0111.3-2.8M14 8a6 6 0 01-11.3 2.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M13 2v3h-3M3 14v-3h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Backfill demographics
+                    </div>
+                    <div class="nav-item" data-section="backfill-metrics">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 3 3 3.5-5L15 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Backfill metrics
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="mainContent">
+            <header class="content-header">
+                <div class="content-header-title">
+                    <h1 id="pageTitle">Dashboard</h1>
+                    <p id="pageSubtitle" class="content-header-sub"></p>
+                </div>
+                <div class="content-header-actions">
+                    <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+                </div>
+            </header>
+
+            <div id="mainPanel" class="content-body">
 
             <!-- Dashboard Section -->
             <div id="dashboardSection" class="dashboard-section" style="display: none;">
@@ -672,9 +720,11 @@
                     </div>
                 </div>
             </div>
-        </div>
-        <!-- Close mainPanel div -->
+            </div>
+            <!-- Close mainPanel / content-body -->
+        </main>
     </div>
+    <!-- Close #app -->
 
     <!-- Toast Notifications -->
     <div id="toast" class="toast"></div>
@@ -806,6 +856,7 @@ async function uploadConceptImage(id) {
 }
     </script>
 
+    <script src="auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
