@@ -58,91 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ═════════════════════════════════════════════════════════
-// AUTHENTICATION
+// AUTHENTICATION + NAVIGATION → see auth.js
 // ═════════════════════════════════════════════════════════
-
-async function login() {
-    const email = document.getElementById('authEmail').value;
-    const password = document.getElementById('authPassword').value;
-
-    if (!email || !password) {
-        showToast('Please enter email and password', 'error');
-        return;
-    }
-
-    try {
-        // Simulate login - replace with actual API call
-        // In production, call your backend login endpoint
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-
-        if (!response.ok) {
-            throw new Error('Login failed');
-        }
-
-        const data = await response.json();
-        currentToken = data.access_token;
-        currentUser = data.user;
-
-        // Save to localStorage
-        localStorage.setItem(TOKEN_KEY, currentToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
-        if (data.refresh_token) {
-            localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
-        }
-
-        startRefreshTimer();
-        showToast('Login successful!', 'success');
-        showMainPanel();
-    } catch (error) {
-        showToast(`Login failed: ${error.message}`, 'error');
-    }
-}
-
-function logout() {
-    stopRefreshTimer();
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TENANT_ID_KEY);
-    currentToken = null;
-    currentUser = null;
-
-    // Reset form
-    const surveyForm = document.getElementById('surveyForm');
-    if (surveyForm) surveyForm.reset();
-    const responseSection = document.getElementById('responseSection');
-    if (responseSection) responseSection.style.display = 'none';
-
-    // Show auth section
-    document.getElementById('authSection').style.display = 'block';
-    document.getElementById('mainPanel').style.display = 'none';
-    document.getElementById('authEmail').value = '';
-    document.getElementById('authPassword').value = '';
-
-    showToast('Logged out successfully', 'success');
-}
-
-// ═════════════════════════════════════════════════════════
-// UI MANAGEMENT - NAVIGATION
-// ═════════════════════════════════════════════════════════
-
-function showMainPanel() {
-    const authSection = document.getElementById('authSection');
-    const mainPanel = document.getElementById('mainPanel');
-
-    if (authSection) authSection.style.display = 'none';
-    if (mainPanel) mainPanel.style.display = 'block';
-
-    // Load tenants
-    loadTenants();
-
-    // Show dashboard by default
-    showDashboard();
-}
 
 function showSurveyForm() {
     // Hide all sections except survey form
@@ -168,7 +85,7 @@ function showSurveysList() {
 
     if (surveysListSection) surveysListSection.style.display = 'block';
 
-    setActiveTab('list');
+    setActiveTab('surveys');
 
     // Load surveys from API
     loadSurveysList();
@@ -216,6 +133,12 @@ async function loadDashboard() {
 }
 
 function displayDashboard(data) {
+    // Update content header subtitle with refresh timestamp
+    const subtitleEl = document.getElementById('pageSubtitle');
+    if (subtitleEl) {
+        subtitleEl.textContent = `Last updated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`;
+    }
+
     // User metrics
     document.getElementById('totalUsers').textContent = data.users.total.toLocaleString();
     document.getElementById('activeUsers').textContent = data.users.active.toLocaleString();
@@ -292,15 +215,27 @@ function hideAllSections() {
     document.getElementById('emailBroadcastSection').style.display = 'none';
 }
 
-function setActiveTab(tab) {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    if (tab === 'dashboard') document.querySelectorAll('.nav-tab')[0].classList.add('active');
-    if (tab === 'create') document.querySelectorAll('.nav-tab')[1].classList.add('active');
-    if (tab === 'list') document.querySelectorAll('.nav-tab')[2].classList.add('active');
-    if (tab === 'notifications') document.querySelectorAll('.nav-tab')[3].classList.add('active');
-    if (tab === 'backfill') document.querySelectorAll('.nav-tab')[4].classList.add('active');
-    if (tab === 'metrics') document.querySelectorAll('.nav-tab')[5].classList.add('active');
-    if (tab === 'email') document.querySelectorAll('.nav-tab')[6].classList.add('active');
+function setActiveTab(section) {
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+        item.classList.toggle('active', item.dataset.section === section);
+    });
+
+    const titles = {
+        dashboard: 'Dashboard',
+        surveys: 'Surveys',
+        create: 'Create survey',
+        notifications: 'Notifications',
+        email: 'Email broadcast',
+        'backfill-demographics': 'Backfill demographics',
+        'backfill-metrics': 'Backfill metrics',
+    };
+
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl && titles[section]) titleEl.textContent = titles[section];
+
+    // Only show subtitle on dashboard
+    const subtitleEl = document.getElementById('pageSubtitle');
+    if (subtitleEl) subtitleEl.style.display = section === 'dashboard' ? '' : 'none';
 }
 
 async function loadSurveysList() {
@@ -506,69 +441,7 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// ═════════════════════════════════════════════════════════
-// ENVIRONMENT SWITCHER
-// ═════════════════════════════════════════════════════════
-
-function applyEnvironment(env) {
-    const banner = document.getElementById('envBanner');
-    const label = document.getElementById('envLabel');
-    const urlDisplay = document.getElementById('envUrl');
-    const prodBtn = document.getElementById('envProdBtn');
-    const devBtn = document.getElementById('envDevBtn');
-
-    if (env === 'dev') {
-        API_BASE_URL = API_URL_DEV;
-        banner.className = 'env-banner env-dev';
-        label.textContent = 'DEVELOPMENT';
-        urlDisplay.textContent = API_URL_DEV.replace('https://', '');
-        prodBtn.classList.remove('env-btn-active');
-        devBtn.classList.add('env-btn-active');
-    } else {
-        API_BASE_URL = API_URL_PROD;
-        banner.className = 'env-banner env-prod';
-        label.textContent = 'PRODUCTION';
-        urlDisplay.textContent = API_URL_PROD.replace('https://', '');
-        prodBtn.classList.add('env-btn-active');
-        devBtn.classList.remove('env-btn-active');
-    }
-}
-
-function switchEnvironment(env) {
-    const currentEnv = localStorage.getItem(ENV_KEY) || 'prod';
-    if (env === currentEnv) return;
-
-    const envName = env === 'dev' ? 'DEVELOPMENT' : 'PRODUCTION';
-    if (!confirm(`Switch to ${envName} environment? You will be logged out.`)) {
-        return;
-    }
-
-    // Logout and clear state
-    stopRefreshTimer();
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(TENANT_ID_KEY);
-    currentToken = null;
-    currentUser = null;
-
-    // Save new env and apply
-    localStorage.setItem(ENV_KEY, env);
-    applyEnvironment(env);
-
-    // Reset UI to login
-    const surveyForm = document.getElementById('surveyForm');
-    if (surveyForm) surveyForm.reset();
-    const responseSection = document.getElementById('responseSection');
-    if (responseSection) responseSection.style.display = 'none';
-
-    document.getElementById('authSection').style.display = 'block';
-    document.getElementById('mainPanel').style.display = 'none';
-    document.getElementById('authEmail').value = '';
-    document.getElementById('authPassword').value = '';
-
-    showToast(`Switched to ${envName}`, 'success');
-}
+// Environment switcher → see auth.js
 
 // ═════════════════════════════════════════════════════════
 // REFRESH TOKEN HANDLING
@@ -1503,7 +1376,7 @@ function showNotifications() {
 function showBackfillDemographics() {
     hideAllSections();
     document.getElementById('backfillDemographicsSection').style.display = 'block';
-    setActiveTab('backfill');
+    setActiveTab('backfill-demographics');
     document.getElementById('backfillResultsSection').style.display = 'none';
     window.scrollTo(0, 0);
 }
@@ -1715,7 +1588,7 @@ async function loadRecentNotifications() {
 function showBackfillMetrics() {
     hideAllSections();
     document.getElementById('backfillMetricsSection').style.display = 'block';
-    setActiveTab('metrics');
+    setActiveTab('backfill-metrics');
     document.getElementById('backfillMetricsResultsSection').style.display = 'none';
     window.scrollTo(0, 0);
 }
