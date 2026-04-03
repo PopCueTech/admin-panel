@@ -353,73 +353,173 @@ body {
 }
 
 /* Surveys List Section */
-.surveys-list-section {
-    padding: 30px;
-}
-
-.surveys-header {
-    display: flex;
-    justify-content: space-between;
+/* Unified badge component */
+.badge {
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 30px;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
 }
 
-.surveys-header h2 {
-    margin: 0;
-    font-size: 1.5em;
+.badge-success {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
 }
 
+.badge-warning {
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+}
+
+/* Legacy status badges — kept for backward compat */
+.status-active {
+    display: inline-flex;
+    align-items: center;
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+
+.status-draft {
+    display: inline-flex;
+    align-items: center;
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+
+/* Filter toolbar */
+.surveys-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+    flex-wrap: wrap;
+}
+
+.surveys-search-input {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+    padding: 7px 10px;
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--border-radius-md);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+}
+
+.surveys-search-input:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(83, 74, 183, 0.1);
+}
+
+.surveys-search-input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.surveys-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.surveys-filters select {
+    padding: 7px 28px 7px 10px;
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--border-radius-md);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.surveys-filters select:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(83, 74, 183, 0.1);
+}
+
+/* Table styles */
 .surveys-table-container {
     overflow-x: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
 }
 
 .surveys-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--color-background-primary);
 }
 
 .surveys-table thead {
-    background: #f3f4f6;
+    background: var(--color-background-secondary);
 }
 
 .surveys-table th {
-    padding: 15px;
+    padding: var(--space-3) var(--space-4);
     text-align: left;
-    font-weight: 600;
-    color: var(--text-color);
-    border-bottom: 2px solid var(--border-color);
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    border-bottom: 0.5px solid var(--color-border-tertiary);
 }
 
 .surveys-table td {
-    padding: 15px;
-    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    font-size: 13px;
 }
 
 .surveys-table tbody tr:hover {
-    background: #f9fafb;
+    background: var(--color-background-secondary);
 }
 
-.status-active {
-    display: inline-block;
-    background: #d1fae5;
-    color: #065f46;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.9em;
+/* Ghost button — lightweight action buttons */
+.btn-ghost {
+    padding: 5px 10px;
+    font-size: 12px;
     font-weight: 500;
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
 }
 
-.status-draft {
-    display: inline-block;
-    background: #fef3c7;
-    color: #92400e;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.9em;
-    font-weight: 500;
+.btn-ghost:hover {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-primary);
+}
+
+.btn-ghost-brand {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+}
+
+.btn-ghost-brand:hover {
+    background: rgba(83, 74, 183, 0.08);
+    border-color: var(--color-brand);
+    color: var(--color-brand-hover);
 }
 
 .logout-section {

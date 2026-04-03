@@ -16,6 +16,7 @@ let currentToken = null;
 let currentSurveyData = null;
 let currentSurveyMetrics = null;
 let refreshTimer = null;
+let allSurveys = [];  // Store for client-side filtering
 
 // ═════════════════════════════════════════════════════════
 // INITIALIZATION
@@ -81,9 +82,9 @@ function showSurveyForm() {
 function showSurveysList() {
     // Hide all sections except surveys list
     hideAllSections();
-    const surveysListSection = document.getElementById('surveysListSection');
+    const surveysSection = document.getElementById('surveysSection');
 
-    if (surveysListSection) surveysListSection.style.display = 'block';
+    if (surveysSection) surveysSection.style.display = 'flex';
 
     setActiveTab('surveys');
 
@@ -207,7 +208,7 @@ async function refreshDashboard() {
 function hideAllSections() {
     document.getElementById('dashboardSection').style.display = 'none';
     document.getElementById('surveyFormSection').style.display = 'none';
-    document.getElementById('surveysListSection').style.display = 'none';
+    document.getElementById('surveysSection').style.display = 'none';
     document.getElementById('notificationsSection').style.display = 'none';
     document.getElementById('surveyDetailsSection').style.display = 'none';
     document.getElementById('backfillDemographicsSection').style.display = 'none';
@@ -240,7 +241,6 @@ function setActiveTab(section) {
 
 async function loadSurveysList() {
     const tableBody = document.getElementById('surveysTableBody');
-    const noCurveysMessage = document.getElementById('noCurveysMessage');
 
     if (!tableBody) {
         console.error('surveys table body not found');
@@ -271,42 +271,126 @@ async function loadSurveysList() {
         const surveys = await response.json();
 
         if (!surveys || surveys.length === 0) {
-            tableBody.innerHTML = '';
-            if (noCurveysMessage) noCurveysMessage.style.display = 'block';
+            allSurveys = [];
+            renderSurveysTable([]);
             return;
         }
 
-        if (noCurveysMessage) noCurveysMessage.style.display = 'none';
+        // Store surveys for client-side filtering
+        allSurveys = surveys;
 
-        // Populate table with surveys (includes completed_count from admin endpoint)
-        tableBody.innerHTML = surveys.map(survey => `
-            <tr>
-                <td><strong>${survey.title || 'Untitled'}</strong></td>
-                <td>${survey.questions_count || 0}</td>
-                <td>
-                    <span class="status-${survey.is_active ? 'active' : 'draft'}">
-                        ${survey.is_active ? '✓ Published' : '⏱ Draft'}
-                    </span>
-                </td>
-                <td>${survey.completed_count || 0} / ${survey.max_responses || 100}</td>
-                <td>${new Date(survey.created_at).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary" onclick="viewSurvey('${survey.id}')">View</button>
-                    ${!survey.is_active ? `<button class="btn btn-sm btn-success" onclick="publishSurveyDirect('${survey.id}')">Publish</button>` : ''}
-                </td>
-            </tr>
-        `).join('');
+        // Render table with all surveys (unfiltered)
+        renderSurveysTable(surveys);
+
+        // Update count display
+        updateSurveysCount();
+
+        // Wire up filter event listeners (only once per load)
+        wireUpSurveyFilters();
 
         console.log(`✅ Loaded ${surveys.length} survey(s)`);
     } catch (error) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; padding: 20px; color: #e74c3c;">
+                <td colspan="6" style="text-align: center; padding: 20px; color: var(--color-error);">
                     Error loading surveys: ${error.message}
                 </td>
             </tr>
         `;
         console.error('Error loading surveys:', error);
+    }
+}
+
+function renderSurveysTable(surveys) {
+    const tableBody = document.getElementById('surveysTableBody');
+    const noSurveysMessage = document.getElementById('noSurveysMessage');
+
+    if (!tableBody) return;
+
+    if (!surveys || surveys.length === 0) {
+        tableBody.innerHTML = '';
+        if (noSurveysMessage) noSurveysMessage.style.display = 'block';
+        return;
+    }
+
+    if (noSurveysMessage) noSurveysMessage.style.display = 'none';
+
+    // Populate table with surveys
+    tableBody.innerHTML = surveys.map(survey => `
+        <tr>
+            <td><strong>${survey.title || 'Untitled'}</strong></td>
+            <td>${survey.questions_count || 0}</td>
+            <td>
+                <span class="status-${survey.is_active ? 'active' : 'draft'}">
+                    ${survey.is_active ? '✓ Published' : '⏱ Draft'}
+                </span>
+            </td>
+            <td>${survey.completed_count || 0} / ${survey.max_responses || 100}</td>
+            <td>${new Date(survey.created_at).toLocaleDateString()}</td>
+            <td style="display: flex; gap: 4px;">
+                <button class="btn-ghost" onclick="viewSurvey('${survey.id}')">View</button>
+                ${!survey.is_active ? `<button class="btn-ghost btn-ghost-brand" onclick="publishSurveyDirect('${survey.id}')">Publish</button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateSurveysCount() {
+    const countDisplay = document.getElementById('surveysCountDisplay');
+    if (countDisplay) {
+        countDisplay.textContent = allSurveys.length;
+    }
+}
+
+function filterSurveys() {
+    const q = document.getElementById('surveysSearch').value.toLowerCase().trim();
+    const status = document.getElementById('surveysStatusFilter').value;
+
+    const filtered = allSurveys.filter(s => {
+        const matchTitle = !q || (s.title || '').toLowerCase().includes(q);
+        const matchStatus = !status
+            || (status === 'published' && s.is_active)
+            || (status === 'draft' && !s.is_active);
+        return matchTitle && matchStatus;
+    });
+
+    renderSurveysTable(filtered);
+
+    // Show/hide clear button
+    const clearBtn = document.getElementById('surveysClearFilters');
+    if (clearBtn) {
+        clearBtn.style.display = (q || status) ? 'inline-flex' : 'none';
+    }
+}
+
+let filterDebounceTimer = null;
+
+function wireUpSurveyFilters() {
+    const searchInput = document.getElementById('surveysSearch');
+    const statusFilter = document.getElementById('surveysStatusFilter');
+    const clearBtn = document.getElementById('surveysClearFilters');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(filterDebounceTimer);
+            filterDebounceTimer = setTimeout(() => {
+                filterSurveys();
+            }, 200);
+        });
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', () => {
+            filterSurveys();
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (statusFilter) statusFilter.value = '';
+            filterSurveys();
+        });
     }
 }
 
