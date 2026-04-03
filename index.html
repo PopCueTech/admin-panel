@@ -330,37 +330,60 @@
             <!-- Close surveyFormSection div -->
 
             <!-- Surveys List Section -->
-            <div id="surveysListSection" class="surveys-list-section" style="display: none;">
-                <div class="surveys-header">
-                    <h2>My Surveys</h2>
-                    <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create New Survey</button>
+            <!-- Surveys Section -->
+            <div id="surveysSection" style="display: none; grid-column: 2; display: flex; flex-direction: column; min-height: 100vh;">
+                <div class="content-header">
+                    <div>
+                        <h1>Surveys</h1>
+                        <p class="content-header-sub"><span id="surveysCountDisplay">0</span> surveys</p>
+                    </div>
+                    <div class="content-header-actions">
+                        <button type="button" class="btn btn-primary" onclick="showSurveyForm()">Create survey</button>
+                    </div>
                 </div>
 
-                <div id="surveysList" class="surveys-table-container">
-                    <table class="surveys-table">
-                        <thead>
-                            <tr>
-                                <th>Survey Title</th>
-                                <th>Questions</th>
-                                <th>Status</th>
-                                <th>Responses</th>
-                                <th>Created</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="surveysTableBody">
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
-                                    Loading surveys...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div class="content-body">
+                    <!-- Filter toolbar -->
+                    <div class="surveys-toolbar">
+                        <input type="search" id="surveysSearch" placeholder="Search surveys…" class="surveys-search-input">
+                        <div class="surveys-filters">
+                            <select id="surveysStatusFilter">
+                                <option value="">All statuses</option>
+                                <option value="published">Published</option>
+                                <option value="draft">Draft</option>
+                            </select>
+                            <button id="surveysClearFilters" class="btn btn-secondary btn-sm" style="display: none;">Clear</button>
+                        </div>
+                    </div>
 
-                <div id="noCurveysMessage" style="display: none; text-align: center; padding: 40px;">
-                    <p style="color: #999; font-size: 1.1em;">No surveys created yet</p>
-                    <button type="button" class="btn btn-primary" onclick="showSurveyForm()">➕ Create Your First Survey</button>
+                    <!-- Surveys table -->
+                    <div class="surveys-table-container">
+                        <table class="surveys-table">
+                            <thead>
+                                <tr>
+                                    <th>Survey Title</th>
+                                    <th>Questions</th>
+                                    <th>Status</th>
+                                    <th>Responses</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="surveysTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 20px; color: var(--color-text-tertiary);">
+                                        Loading surveys...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="noSurveysMessage" style="display: none; text-align: center; padding: 60px 20px;">
+                        <p style="color: var(--color-text-tertiary); font-size: 1em; margin-bottom: 16px;">No surveys yet</p>
+                        <button type="button" class="btn btn-primary" onclick="showSurveyForm()">Create your first survey</button>
+                    </div>
                 </div>
             </div>
 
