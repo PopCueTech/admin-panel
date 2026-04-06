@@ -81,6 +81,7 @@ function showMainPanel() {
         create: showSurveyForm,
         notifications: showNotifications,
         email: showEmailBroadcast,
+        panels: showPanels,
         'backfill-demographics': showBackfillDemographics,
         'backfill-metrics': showBackfillMetrics,
     };
