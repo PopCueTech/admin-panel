@@ -6,6 +6,7 @@
     <title>PopCue AI Survey Generator</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="auth.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
     <!-- Auth Screen -->
@@ -77,6 +78,10 @@
                     <div class="nav-item" data-section="email">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 4.5L8 9l6.5-4.5" stroke="currentColor" stroke-width="1.2"/></svg>
                         Email broadcast
+                    </div>
+                    <div class="nav-item" data-section="panels">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2 10h4c1.1 0 2 .9 2 2v2H2v-2c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.2"/><path d="M8 10h4c1.1 0 2 .9 2 2v2H8v-2c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.2"/></svg>
+                        Panels
                     </div>
                 </div>
                 <div class="nav-group">
@@ -271,6 +276,13 @@
                             <!-- Populated from API -->
                         </select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="surveyPanel">Restrict to Panel <span style="color: var(--color-text-tertiary); font-weight: 400;">(optional)</span></label>
+                    <select id="surveyPanel">
+                        <option value="">— Public survey (no panel restriction) —</option>
+                    </select>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-large" id="generateBtn">Generate Survey</button>
@@ -600,6 +612,31 @@
                 </div>
             </div>
 
+            <!-- Panels Section -->
+            <div id="panelsSection" style="display: none; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Panels Management</h2>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="openCreatePanelModal()">+ Create Panel</button>
+                </div>
+
+                <div class="surveys-table-container">
+                    <table class="surveys-table">
+                        <thead>
+                            <tr>
+                                <th>Panel Name</th>
+                                <th>Panel Code</th>
+                                <th>Members</th>
+                                <th>Status</th>
+                                <th style="width: 200px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="panelsTableBody">
+                            <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading panels...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Survey Details Section -->
             <div id="surveyDetailsSection" class="survey-details-section" style="display: none;">
                 <div class="details-header">
@@ -879,7 +916,47 @@ async function uploadConceptImage(id) {
 }
     </script>
 
+    <!-- Panel QR Code Modal -->
+    <div id="panelQRModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="text-align: center; min-width: 360px; max-width: 420px;">
+            <h3 id="panelQRTitle" style="margin-bottom: 4px;">Panel QR Code</h3>
+            <p id="panelQRSubtitle" style="color: #666; font-size: 13px; margin: 0 0 20px 0;">Scan to join panel</p>
+            <div id="panelQRCanvas" style="display: flex; justify-content: center; margin-bottom: 16px; background: #fff; border-radius: 8px; padding: 16px; border: 1px solid #e5e7eb;"></div>
+            <div style="margin-bottom: 20px;">
+                <span class="panel-code-badge" id="panelQRCode" style="justify-content: center; font-size: 1.3em;"></span>
+            </div>
+            <p style="font-size: 11px; color: #999; margin: 0 0 20px 0;">QR contains the plain panel code. Users can scan this with the PopCue app.</p>
+            <div class="button-group">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closePanelQRModal()">Close</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="copyPanelCode()" id="panelQRCopyBtn">📋 Copy Code</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="downloadPanelQR()">⬇ Download PNG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Modal Overlay -->
+    <div id="panelModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="panelModalTitle">Create Panel</h3>
+            <form id="panelForm">
+                <div class="form-group">
+                    <label>Panel Name</label>
+                    <input type="text" id="panelName" required maxlength="255" placeholder="e.g., Tech Enthusiasts, Q2 Cohort">
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea id="panelDescription" rows="3" maxlength="2000" placeholder="Describe the purpose of this panel..."></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closePanelModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="panelModalSubmitBtn">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="auth.js"></script>
+    <script src="panels.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

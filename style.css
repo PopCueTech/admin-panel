@@ -1883,3 +1883,105 @@ body {
     color: #64748b;
     font-size: 12px;
 }
+
+/* ═════════════════════════════════════════════════════════════════
+   PANEL STYLES
+   ═════════════════════════════════════════════════════════════════ */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background: var(--color-background-primary, white);
+    border-radius: var(--border-radius-lg, 10px);
+    padding: 28px;
+    min-width: 420px;
+    max-width: 520px;
+    box-shadow: var(--shadow-md, 0 10px 25px rgba(0,0,0,0.1));
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-content h3 {
+    margin: 0 0 20px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color, #1a1a1a);
+}
+
+.modal-content .form-group {
+    margin-bottom: 16px;
+}
+
+.modal-content .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-color, #1a1a1a);
+}
+
+.modal-content .form-group input,
+.modal-content .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #f9fafb;
+}
+
+.modal-content .form-group input:focus,
+.modal-content .form-group textarea:focus {
+    outline: none;
+    border-color: #534AB7;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(83, 74, 183, 0.1);
+}
+
+.modal-content .button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.modal-content .button-group .btn {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 13px;
+}
+
+.panel-code-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 1.1em;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 6px 14px;
+    background: var(--color-background-tertiary, #f3f4f6);
+    border: 1px solid var(--color-border-primary, #e5e7eb);
+    border-radius: var(--border-radius-md, 6px);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-color, #1a1a1a);
+    user-select: all;
+}

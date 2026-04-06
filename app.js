@@ -214,6 +214,7 @@ function hideAllSections() {
     document.getElementById('backfillDemographicsSection').style.display = 'none';
     document.getElementById('backfillMetricsSection').style.display = 'none';
     document.getElementById('emailBroadcastSection').style.display = 'none';
+    document.getElementById('panelsSection').style.display = 'none';
 }
 
 function setActiveTab(section) {
@@ -227,6 +228,7 @@ function setActiveTab(section) {
         create: 'Create survey',
         notifications: 'Notifications',
         email: 'Email broadcast',
+        panels: 'Panels',
         'backfill-demographics': 'Backfill demographics',
         'backfill-metrics': 'Backfill metrics',
     };
@@ -614,6 +616,7 @@ async function generateSurvey() {
     const tenantId = document.getElementById('tenantId').value;
     const surveyType = document.getElementById('surveyType').value;
     const isMultiConcept = document.querySelector('input[name="conceptType"]:checked').value === 'multi';
+    const panelId = document.getElementById('surveyPanel').value || null;
 
     if (!name || !description || !context || !tenantId || !surveyType) {
         showToast('Please fill in all required fields', 'error');
@@ -640,7 +643,8 @@ async function generateSurvey() {
                 tenant_id: tenantId,
                 test_type: surveyType,
                 is_multi_concept: isMultiConcept,
-                concepts: getConceptsFromForm()  // ss: send concepts with image URLs
+                concepts: getConceptsFromForm(),  // ss: send concepts with image URLs
+                panel_id: panelId
             })
         });
 
