@@ -75,6 +75,9 @@ function showSurveyForm() {
 
     setActiveTab('create');
 
+    // Populate panel dropdown
+    if (typeof loadPanelsForSurveyForm === 'function') loadPanelsForSurveyForm();
+
     // Scroll to top
     window.scrollTo(0, 0);
 }
