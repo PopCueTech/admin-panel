@@ -83,6 +83,10 @@
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2 10h4c1.1 0 2 .9 2 2v2H2v-2c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.2"/><path d="M8 10h4c1.1 0 2 .9 2 2v2H8v-2c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.2"/></svg>
                         Panels
                     </div>
+                    <div class="nav-item" data-section="profile-questionnaires">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 14c0-2.5 2-4.5 5-4.5s5 2 5 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Profile questionnaires
+                    </div>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-label">Utilities</div>
@@ -637,6 +641,90 @@
                 </div>
             </div>
 
+            <!-- Profile Questionnaires Section -->
+            <div id="profileQuestionnairesSection" style="display: none; padding: 20px;">
+                <!-- LIST view -->
+                <div id="profileQuestionnaireListView">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h2 style="margin:0;">Profile questionnaires</h2>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="showProfileQuestionnaireForm()">+ Create profile questionnaire</button>
+                    </div>
+                    <p style="color:#666; margin-bottom:20px; font-size:13px;">
+                        Profile questionnaires populate user profile attributes (not survey analytics). Each question must have an
+                        <code>attribute_key</code> mapping to a key on <code>user_profiles.profile_attributes</code>.
+                    </p>
+                    <div class="surveys-table-container">
+                        <table class="surveys-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Questions</th>
+                                    <th>Status</th>
+                                    <th>Completions</th>
+                                    <th>Points</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profileQuestionnairesTableBody">
+                                <tr><td colspan="6" style="text-align:center; padding:40px; color:#999;">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- FORM view -->
+                <div id="profileQuestionnaireFormView" style="display:none; max-width:900px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h2 style="margin:0;">Create profile questionnaire</h2>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeProfileQuestionnaireForm()">← Back to list</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Title *</label>
+                        <input type="text" id="pqTitle" placeholder="e.g. Pantry & shopping habits" maxlength="500">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="pqDescription" placeholder="Optional. Shown to users on the survey card." rows="2" maxlength="2000"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Points reward (0 = no points)</label>
+                            <input type="number" id="pqPoints" value="0" min="0" max="500">
+                        </div>
+                        <div class="form-group">
+                            <label>Tenant *</label>
+                            <select id="pqTenantId">
+                                <option value="">Select organization</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" id="pqPublish" checked>
+                            Publish immediately (uncheck to save as draft)
+                        </label>
+                    </div>
+
+                    <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <h3 style="margin:0;">Questions</h3>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="addProfileQuestionCard()">+ Add question</button>
+                        </div>
+                        <small id="pqExistingKeysHint" style="color:#666; display:block; margin-bottom:12px;"></small>
+                        <div id="pqQuestionCards"></div>
+                    </div>
+
+                    <div class="button-group" style="margin-top:24px;">
+                        <button type="button" class="btn btn-primary" onclick="submitProfileQuestionnaire()">Save profile questionnaire</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeProfileQuestionnaireForm()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Survey Details Section -->
             <div id="surveyDetailsSection" class="survey-details-section" style="display: none;">
                 <div class="details-header">
@@ -957,6 +1045,7 @@ async function uploadConceptImage(id) {
 
     <script src="auth.js"></script>
     <script src="panels.js"></script>
+    <script src="profile_questionnaire.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

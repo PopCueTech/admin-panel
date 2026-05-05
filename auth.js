@@ -82,6 +82,7 @@ function showMainPanel() {
         notifications: showNotifications,
         email: showEmailBroadcast,
         panels: showPanels,
+        'profile-questionnaires': showProfileQuestionnaires,
         'backfill-demographics': showBackfillDemographics,
         'backfill-metrics': showBackfillMetrics,
     };
