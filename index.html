@@ -98,6 +98,10 @@
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 3 3 3.5-5L15 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Backfill metrics
                     </div>
+                    <div class="nav-item" data-section="validator">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Survey validator
+                    </div>
                 </div>
             </nav>
         </aside>
@@ -573,6 +577,30 @@
                             <button type="button" class="btn btn-secondary btn-sm" onclick="hideBackfillMetricsResults()">✕ Close</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Survey Validator Section -->
+            <div id="validatorSection" style="display: none; padding: 20px;">
+                <div class="details-card">
+                    <h3>Survey JSON validator</h3>
+                    <p style="color: #666; font-size: 13px; margin: 8px 0 16px 0;">
+                        Paste a survey structure JSON below to check it for duplicate question IDs and other issues
+                        that would cause silent data loss when users submit responses. Read-only — does not modify any survey.
+                    </p>
+
+                    <div class="form-group">
+                        <label for="validatorJsonInput">Survey structure JSON</label>
+                        <textarea id="validatorJsonInput" rows="18" placeholder='Paste a survey structure here, e.g. {"test_type":"concept_test","title":"...","questions":[...]}' style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                    </div>
+
+                    <div class="button-group" style="margin-top: 12px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="runStandaloneValidation()">✓ Validate</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="clearValidatorInput()">Clear</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="loadValidatorSample()">Load sample (buggy)</button>
+                    </div>
+
+                    <div id="validatorBanner" class="validation-banner" style="display: none; margin-top: 20px;"></div>
                 </div>
             </div>
 

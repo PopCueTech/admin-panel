@@ -85,6 +85,7 @@ function showMainPanel() {
         'profile-questionnaires': showProfileQuestionnaires,
         'backfill-demographics': showBackfillDemographics,
         'backfill-metrics': showBackfillMetrics,
+        validator: showValidatorPage,
     };
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         item.addEventListener('click', () => sectionMap[item.dataset.section]?.());

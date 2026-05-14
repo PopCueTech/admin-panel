@@ -220,6 +220,8 @@ function hideAllSections() {
     document.getElementById('panelsSection').style.display = 'none';
     const pq = document.getElementById('profileQuestionnairesSection');
     if (pq) pq.style.display = 'none';
+    const vs = document.getElementById('validatorSection');
+    if (vs) vs.style.display = 'none';
 }
 
 function setActiveTab(section) {
@@ -237,6 +239,7 @@ function setActiveTab(section) {
         'profile-questionnaires': 'Profile questionnaires',
         'backfill-demographics': 'Backfill demographics',
         'backfill-metrics': 'Backfill metrics',
+        validator: 'Survey validator',
     };
 
     const titleEl = document.getElementById('pageTitle');
@@ -855,6 +858,79 @@ function escapeValidationHTML(str) {
     return String(str).replace(/[&<>"']/g, ch => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[ch]));
+}
+
+// Standalone validator page — paste any survey JSON and check it
+function showValidatorPage() {
+    hideAllSections();
+    const section = document.getElementById('validatorSection');
+    if (section) section.style.display = 'block';
+    setActiveTab('validator');
+    window.scrollTo(0, 0);
+}
+
+function runStandaloneValidation() {
+    const input = document.getElementById('validatorJsonInput');
+    const banner = document.getElementById('validatorBanner');
+    if (!input || !banner) return;
+
+    const raw = input.value.trim();
+    if (!raw) {
+        banner.innerHTML = '<div class="validation-banner-header">⚠️ Paste a survey JSON above first.</div>';
+        banner.className = 'validation-banner warning';
+        banner.style.display = 'block';
+        return;
+    }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (err) {
+        banner.innerHTML =
+            '<div class="validation-banner-header">❌ Invalid JSON</div>' +
+            '<ul class="validation-banner-list"><li>' + escapeValidationHTML(err.message) + '</li></ul>';
+        banner.className = 'validation-banner error';
+        banner.style.display = 'block';
+        return;
+    }
+
+    // Accept either a raw structure or a wrapper like {structure: {...}} or {current_version:{structure:{...}}}
+    let structure = parsed;
+    if (parsed && parsed.structure && typeof parsed.structure === 'object') {
+        structure = parsed.structure;
+    } else if (parsed && parsed.current_version && parsed.current_version.structure) {
+        structure = parsed.current_version.structure;
+    }
+
+    renderValidationBanner('validatorBanner', structure);
+}
+
+function clearValidatorInput() {
+    const input = document.getElementById('validatorJsonInput');
+    const banner = document.getElementById('validatorBanner');
+    if (input) input.value = '';
+    if (banner) {
+        banner.innerHTML = '';
+        banner.style.display = 'none';
+    }
+}
+
+function loadValidatorSample() {
+    const sample = {
+        test_type: 'concept_test',
+        title: 'Sample buggy survey (duplicate q_general)',
+        description: 'Five questions share id "q_general" — only the first answer per session would save.',
+        questions: [
+            { id: 'q_general', order: 1, type: 'mcq', title: 'Which fast-food restaurant do you visit most often?', required: true, data: { options: [{ id: 'mcdonalds', text: "McDonald's" }, { id: 'starbucks', text: 'Starbucks' }], allow_multiple: false } },
+            { id: 'q_general', order: 2, type: 'mcq', title: 'What beverage are you most likely to order?', required: true, data: { options: [{ id: 'iced_coffee', text: 'Iced Coffee' }, { id: 'tea', text: 'Tea' }], allow_multiple: false } },
+            { id: 'q_appeal', order: 3, type: 'multi_slider', title: 'How appealing does each concept sound?', required: true, data: { sliders: [{ id: 'a', description: 'Concept A' }, { id: 'b', description: 'Concept B' }], emojis: { left: '😐', right: '🤩' } } },
+            { id: 'q_general', order: 4, type: 'mcq', title: 'Which one would you most want to try?', required: true, data: { options: [{ id: 'a', text: 'Concept A' }], allow_multiple: false } },
+            { id: 'q_general', order: 5, type: 'text', title: 'What makes your top choice stand out?', required: false, data: { min_length: 10, max_length: 300 } }
+        ]
+    };
+    const input = document.getElementById('validatorJsonInput');
+    if (input) input.value = JSON.stringify(sample, null, 2);
+    runStandaloneValidation();
 }
 
 function renderValidationBanner(bannerId, structure) {
