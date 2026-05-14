@@ -672,6 +672,224 @@ async function generateSurvey() {
     }
 }
 
+// ═════════════════════════════════════════════════════════
+// SURVEY STRUCTURE VALIDATOR (client-side, read-only)
+// ═════════════════════════════════════════════════════════
+
+function validateSurveyStructure(structure) {
+    const errors = [];
+    const warnings = [];
+
+    if (!structure || typeof structure !== 'object') {
+        errors.push({ code: 'no_structure', message: 'No survey structure provided.', location: null });
+        return { errors, warnings };
+    }
+
+    const questions = structure.questions;
+    if (!Array.isArray(questions) || questions.length === 0) {
+        errors.push({ code: 'no_questions', message: 'Survey has no questions.', location: null });
+        return { errors, warnings };
+    }
+
+    const locOf = (q, idx) => {
+        const title = q && q.title ? ` — "${truncateText(q.title, 60)}"` : '';
+        return `Q${idx + 1}${title}`;
+    };
+
+    // 1. Per-question required fields
+    questions.forEach((q, idx) => {
+        const loc = locOf(q, idx);
+        if (!q || typeof q !== 'object') {
+            errors.push({ code: 'invalid_question', message: 'Question entry is not an object.', location: `Q${idx + 1}` });
+            return;
+        }
+        if (!q.id || typeof q.id !== 'string') {
+            errors.push({ code: 'missing_id', message: 'Missing required "id" field.', location: loc });
+        }
+        if (!q.type) {
+            errors.push({ code: 'missing_type', message: 'Missing required "type" field.', location: loc });
+        }
+        if (!q.title) {
+            warnings.push({ code: 'missing_title', message: 'Question has no "title".', location: loc });
+        }
+        if (q.order === undefined || q.order === null) {
+            warnings.push({ code: 'missing_order', message: 'Question has no "order" field.', location: loc });
+        }
+    });
+
+    // 2. Duplicate question.id — the bug that caused the incident
+    const idGroups = {};
+    questions.forEach((q, idx) => {
+        if (q && q.id) {
+            if (!idGroups[q.id]) idGroups[q.id] = [];
+            idGroups[q.id].push({ idx, title: q.title });
+        }
+    });
+    Object.entries(idGroups).forEach(([id, group]) => {
+        if (group.length > 1) {
+            const list = group
+                .map(g => `Q${g.idx + 1}${g.title ? ` ("${truncateText(g.title, 40)}")` : ''}`)
+                .join(', ');
+            errors.push({
+                code: 'duplicate_question_id',
+                message: `${group.length} questions share id "${id}" — only the first answer per session will be saved; the rest will be silently dropped. Affected: ${list}.`,
+                location: null,
+            });
+        }
+    });
+
+    // 3. Duplicate option.id within a question
+    questions.forEach((q, idx) => {
+        const loc = locOf(q, idx);
+        const options = q && q.data && q.data.options;
+        if (Array.isArray(options)) {
+            const seen = {};
+            options.forEach(o => {
+                if (o && o.id) seen[o.id] = (seen[o.id] || 0) + 1;
+            });
+            Object.entries(seen).forEach(([oid, count]) => {
+                if (count > 1) {
+                    errors.push({
+                        code: 'duplicate_option_id',
+                        message: `Option id "${oid}" appears ${count} times.`,
+                        location: loc,
+                    });
+                }
+            });
+        }
+    });
+
+    // 4. Duplicate slider.id within a question
+    questions.forEach((q, idx) => {
+        const loc = locOf(q, idx);
+        const sliders = q && q.data && q.data.sliders;
+        if (Array.isArray(sliders)) {
+            const seen = {};
+            sliders.forEach(s => {
+                if (s && s.id) seen[s.id] = (seen[s.id] || 0) + 1;
+            });
+            Object.entries(seen).forEach(([sid, count]) => {
+                if (count > 1) {
+                    errors.push({
+                        code: 'duplicate_slider_id',
+                        message: `Slider id "${sid}" appears ${count} times.`,
+                        location: loc,
+                    });
+                }
+            });
+        }
+    });
+
+    // 5. Type/data shape mismatch (warnings)
+    questions.forEach((q, idx) => {
+        if (!q || !q.type) return;
+        const loc = locOf(q, idx);
+        const data = q.data || {};
+        switch (q.type) {
+            case 'text':
+                if (data.options || data.sliders) {
+                    warnings.push({ code: 'shape_mismatch', message: 'Text question has unexpected "options"/"sliders" in data.', location: loc });
+                }
+                if (data.min_length === undefined && data.max_length === undefined) {
+                    warnings.push({ code: 'text_missing_length', message: 'Text question has no min_length/max_length.', location: loc });
+                }
+                break;
+            case 'mcq':
+                if (!Array.isArray(data.options) || data.options.length === 0) {
+                    warnings.push({ code: 'mcq_missing_options', message: 'MCQ has no options array.', location: loc });
+                }
+                break;
+            case 'multi_slider':
+                if (!Array.isArray(data.sliders) || data.sliders.length === 0) {
+                    warnings.push({ code: 'multi_slider_missing_sliders', message: 'multi_slider has no sliders array.', location: loc });
+                }
+                break;
+            case 'rating':
+                if (data.scale === undefined) {
+                    warnings.push({ code: 'rating_missing_scale', message: 'Rating question has no "scale".', location: loc });
+                }
+                break;
+            case 'ranking':
+                if (!Array.isArray(data.items) || data.items.length === 0) {
+                    warnings.push({ code: 'ranking_missing_items', message: 'Ranking question has no items array.', location: loc });
+                }
+                break;
+            case 'slider':
+                // single slider — no required nested array
+                break;
+            case 'image_selection':
+                if (!Array.isArray(data.images) || data.images.length === 0) {
+                    warnings.push({ code: 'image_selection_missing_images', message: 'image_selection has no images array.', location: loc });
+                }
+                break;
+        }
+    });
+
+    // 6. Duplicate `order` values
+    const orderSeen = {};
+    questions.forEach(q => {
+        if (q && q.order !== undefined && q.order !== null) {
+            orderSeen[q.order] = (orderSeen[q.order] || 0) + 1;
+        }
+    });
+    Object.entries(orderSeen).forEach(([ord, count]) => {
+        if (count > 1) {
+            warnings.push({
+                code: 'duplicate_order',
+                message: `${count} questions share order value "${ord}".`,
+                location: null,
+            });
+        }
+    });
+
+    return { errors, warnings };
+}
+
+function truncateText(s, max) {
+    if (!s) return '';
+    const str = String(s);
+    return str.length > max ? str.slice(0, max - 1) + '…' : str;
+}
+
+function escapeValidationHTML(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function renderValidationBanner(bannerId, structure) {
+    const banner = document.getElementById(bannerId);
+    if (!banner) return;
+
+    const { errors, warnings } = validateSurveyStructure(structure);
+
+    const renderList = (items) => items
+        .map(it => `<li>${it.location ? `<strong>${escapeValidationHTML(it.location)}:</strong> ` : ''}${escapeValidationHTML(it.message)}</li>`)
+        .join('');
+
+    if (errors.length > 0) {
+        let html = `<div class="validation-banner-header">❌ Survey has ${errors.length} issue${errors.length !== 1 ? 's' : ''} that will cause data loss:</div>`;
+        html += `<ul class="validation-banner-list">${renderList(errors)}</ul>`;
+        if (warnings.length > 0) {
+            html += `<div class="validation-banner-subhead">Plus ${warnings.length} non-critical warning${warnings.length !== 1 ? 's' : ''}:</div>`;
+            html += `<ul class="validation-banner-list">${renderList(warnings)}</ul>`;
+        }
+        banner.innerHTML = html;
+        banner.className = 'validation-banner error';
+        banner.style.display = 'block';
+    } else if (warnings.length > 0) {
+        let html = `<div class="validation-banner-header">⚠️ Heads up — ${warnings.length} issue${warnings.length !== 1 ? 's' : ''} to review:</div>`;
+        html += `<ul class="validation-banner-list">${renderList(warnings)}</ul>`;
+        banner.innerHTML = html;
+        banner.className = 'validation-banner warning';
+        banner.style.display = 'block';
+    } else {
+        banner.innerHTML = '<div class="validation-banner-header">✅ Survey structure validated — no issues found.</div>';
+        banner.className = 'validation-banner ok';
+        banner.style.display = 'block';
+    }
+}
+
 function displaySurveyResponse(data) {
     const responseSection = document.getElementById('responseSection');
     const successMessage = document.getElementById('successMessage');
@@ -685,6 +903,9 @@ function displaySurveyResponse(data) {
 
     // Display structure
     document.getElementById('structurePreview').textContent = JSON.stringify(data.structure, null, 2);
+
+    // Client-side structure validation banner
+    renderValidationBanner('surveyValidationBanner', data.structure);
 
     // Display warnings if any
     if (data.validation_warnings && data.validation_warnings.length > 0) {
@@ -842,6 +1063,9 @@ function showSurveyDetails(survey) {
         statusBadge.textContent = '⏱ Draft';
         statusBadge.className = 'status-badge status-draft';
     }
+
+    // Client-side structure validation banner
+    renderValidationBanner('surveyValidationBannerDetail', survey.current_version && survey.current_version.structure);
 
     // Display questions
     const questionsList = document.getElementById('questionsListDetail');

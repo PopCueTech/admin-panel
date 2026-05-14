@@ -753,6 +753,65 @@ body {
     font-weight: 500;
 }
 
+/* Client-side structure validation banner */
+.validation-banner {
+    margin: 16px 0 20px;
+    padding: 14px 16px;
+    border-radius: 6px;
+    border-left: 4px solid;
+    font-size: 0.95em;
+    line-height: 1.45;
+}
+
+.validation-banner.error {
+    background: #fee2e2;
+    color: #7f1d1d;
+    border-left-color: #dc2626;
+    border: 1px solid #fca5a5;
+    border-left-width: 4px;
+}
+
+.validation-banner.warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-left-color: #d97706;
+    border: 1px solid #fcd34d;
+    border-left-width: 4px;
+}
+
+.validation-banner.ok {
+    background: #d1fae5;
+    color: #065f46;
+    border-left-color: #059669;
+    border: 1px solid #6ee7b7;
+    border-left-width: 4px;
+}
+
+.validation-banner-header {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.validation-banner-subhead {
+    font-weight: 600;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    opacity: 0.85;
+}
+
+.validation-banner-list {
+    margin: 4px 0 0 22px;
+    padding: 0;
+}
+
+.validation-banner-list li {
+    margin: 4px 0;
+}
+
+.validation-banner-list li strong {
+    font-weight: 600;
+}
+
 /* Warnings */
 .warnings {
     margin-top: 20px;
