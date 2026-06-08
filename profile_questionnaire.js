@@ -13,6 +13,8 @@
 //   POST /api/v1/admin/profile-surveys         (manual create — no AI)
 
 const PQ_QUESTION_TYPES = [
+    { value: 'single_select', label: 'Single select' },
+    { value: 'multi_select',  label: 'Multi select' },
     { value: 'mcq', label: 'Multiple choice' },
     { value: 'rating', label: 'Rating (1–5)' },
     { value: 'text', label: 'Text input' },
@@ -228,10 +230,10 @@ function onPqTypeChange(id) {
     if (!typeEl || !wrap) return;
     const type = typeEl.value;
 
-    if (type === 'mcq') {
+    if (type === 'mcq' || type === 'single_select' || type === 'multi_select') {
         wrap.innerHTML = `
             <label style="font-size:0.85rem;">Options (one per line) *</label>
-            <textarea id="pq-options-${id}" rows="4" placeholder="Vegetarian&#10;Vegan&#10;Pescatarian&#10;No restrictions"></textarea>
+            <textarea id="pq-options-${id}" rows="4" placeholder="Option A&#10;Option B&#10;Option C"></textarea>
         `;
     } else if (type === 'slider') {
         wrap.innerHTML = `
@@ -271,7 +273,7 @@ function _collectPqQuestion(cardId) {
     }
 
     const data = {};
-    if (type === 'mcq') {
+    if (type === 'mcq' || type === 'single_select' || type === 'multi_select') {
         const raw = (document.getElementById(`pq-options-${cardId}`)?.value || '').trim();
         const opts = raw.split('\n').map(s => s.trim()).filter(Boolean);
         if (opts.length < 2) throw new Error(`Question "${title}" needs at least 2 options`);

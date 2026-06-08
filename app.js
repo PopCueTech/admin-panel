@@ -18,6 +18,12 @@ let currentSurveyMetrics = null;
 let refreshTimer = null;
 let allSurveys = [];  // Store for client-side filtering
 
+// Analytics engine configuration
+const ANALYTICS_ENGINE_URL = 'https://analytics-engine-p-812411253957.us-central1.run.app';
+const ANALYTICS_POLL_INTERVAL_MS = 5000;
+let currentAnalyticsJobId = null;
+let analyticsPollInterval = null;
+
 // ═════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═════════════════════════════════════════════════════════
@@ -1182,15 +1188,22 @@ function updateActionButtons(survey) {
     const publishBtn = document.getElementById('publishDetailBtn');
     const unpublishBtn = document.getElementById('unpublishDetailBtn');
 
+    const runAnalyticsBtn = document.getElementById('runAnalyticsBtn');
+    const analyticsCard = document.getElementById('analyticsCard');
+
     // Only show download button for published surveys
     if (survey.is_active) {
         downloadBtn.style.display = 'inline-block';
         downloadMetricsBtn.style.display = 'inline-block';
+        runAnalyticsBtn.style.display = 'inline-block';
+        analyticsCard.style.display = 'block';
         publishBtn.style.display = 'none';
         unpublishBtn.style.display = 'inline-block';
     } else {
         downloadBtn.style.display = 'none';
         downloadMetricsBtn.style.display = 'none';
+        runAnalyticsBtn.style.display = 'none';
+        analyticsCard.style.display = 'none';
         publishBtn.style.display = 'inline-block';
         unpublishBtn.style.display = 'none';
     }
@@ -1198,6 +1211,12 @@ function updateActionButtons(survey) {
 
 function backToSurveysList() {
     currentSurveyData = null;
+    // Clear analytics polling if running
+    if (analyticsPollInterval) {
+        clearInterval(analyticsPollInterval);
+        analyticsPollInterval = null;
+    }
+    currentAnalyticsJobId = null;
     showSurveysList();
 }
 
@@ -2200,5 +2219,361 @@ async function loadEmailBroadcastHistory() {
         container.innerHTML = tableHTML;
     } catch (error) {
         container.innerHTML = `<p style="color: #c00;">Failed to load history: ${error.message}</p>`;
+    }
+}
+
+// ═════════════════════════════════════════════════════════
+// ANALYTICS PIPELINE
+// ═════════════════════════════════════════════════════════
+
+function showAnalyticsModal() {
+    // Reset validation
+    document.getElementById('weightsValidation').style.display = 'none';
+    // Reset to defaults
+    document.getElementById('weightCs').value = '0.6';
+    document.getElementById('weightBq').value = '0.2';
+    document.getElementById('weightPq').value = '0.2';
+    document.getElementById('eiDuration').value = '15';
+    document.getElementById('startPipelineBtn').disabled = false;
+    document.getElementById('startPipelineBtn').textContent = '🚀 Start Pipeline';
+    document.getElementById('analyticsWeightsModal').style.display = 'flex';
+}
+
+function closeAnalyticsModal() {
+    document.getElementById('analyticsWeightsModal').style.display = 'none';
+}
+
+async function startAnalyticsPipeline() {
+    if (!currentSurveyData) {
+        showToast('No survey data available', 'error');
+        return;
+    }
+
+    // Validate weights
+    const cs = parseFloat(document.getElementById('weightCs').value) || 0;
+    const bq = parseFloat(document.getElementById('weightBq').value) || 0;
+    const pq = parseFloat(document.getElementById('weightPq').value) || 0;
+    const eiDuration = parseInt(document.getElementById('eiDuration').value) || 15;
+    const sum = cs + bq + pq;
+
+    if (Math.abs(sum - 1.0) > 0.01) {
+        const validationEl = document.getElementById('weightsValidation');
+        validationEl.textContent = `Weights must sum to 1.0 (currently ${sum.toFixed(2)})`;
+        validationEl.style.display = 'block';
+        return;
+    }
+
+    const startBtn = document.getElementById('startPipelineBtn');
+    startBtn.disabled = true;
+    startBtn.textContent = '⏳ Starting...';
+
+    const surveyId = currentSurveyData.id;
+
+    try {
+        // Step 1: Upload survey summary to GCS
+        showToast('📤 Uploading survey summary to GCS...', 'success');
+        updateAnalyticsContent('📤 Uploading survey summary to GCS...');
+
+        const uploadResponse = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/surveys/${surveyId}/upload-summary`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        );
+
+        if (!uploadResponse.ok) {
+            const err = await uploadResponse.json();
+            throw new Error(err.detail || 'Failed to upload survey summary');
+        }
+
+        const uploadData = await uploadResponse.json();
+        const signedUrl = uploadData.signed_url;
+        const bucketName = uploadData.bucket;
+
+        showToast('✅ Survey summary uploaded. Starting analytics pipeline...', 'success');
+        updateAnalyticsContent('✅ Uploaded to GCS. Starting analytics pipeline...');
+
+        // Step 2: Trigger analytics pipeline
+        const pipelineBody = {
+            survey_id: surveyId,
+            signed_url: signedUrl,
+            bucket_name: bucketName,
+            exec_summary_weights: { cs, bq, pq },
+            survey_title: currentSurveyData.title || null,
+            collection_duration_minutes: eiDuration,
+        };
+
+        const pipelineResponse = await fetch(`${ANALYTICS_ENGINE_URL}/pipeline/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pipelineBody),
+        });
+
+        if (!pipelineResponse.ok) {
+            const err = await pipelineResponse.json().catch(() => ({}));
+            throw new Error(err.detail || `Pipeline failed to start (HTTP ${pipelineResponse.status})`);
+        }
+
+        const pipelineData = await pipelineResponse.json();
+        currentAnalyticsJobId = pipelineData.job_id;
+
+        showToast(`🚀 Pipeline started! Job: ${currentAnalyticsJobId}`, 'success');
+        closeAnalyticsModal();
+
+        // Show analytics card and start polling
+        document.getElementById('analyticsCard').style.display = 'block';
+        document.getElementById('analyticsRefreshBtn').style.display = 'inline-block';
+        document.getElementById('pipelineSteps').style.display = 'block';
+
+        updateAnalyticsContent(`🚀 Pipeline running — Job: ${currentAnalyticsJobId}`);
+        startAnalyticsPolling();
+
+    } catch (error) {
+        showToast(`❌ Analytics error: ${error.message}`, 'error');
+        updateAnalyticsContent(`❌ Error: ${error.message}`);
+        console.error('Analytics pipeline error:', error);
+    } finally {
+        startBtn.disabled = false;
+        startBtn.textContent = '🚀 Start Pipeline';
+    }
+}
+
+function updateAnalyticsContent(message) {
+    document.getElementById('analyticsContent').innerHTML =
+        `<p style="font-size: 13px; color: #555; margin: 8px 0;">${message}</p>`;
+}
+
+function startAnalyticsPolling() {
+    // Clear any existing interval
+    if (analyticsPollInterval) clearInterval(analyticsPollInterval);
+
+    // Poll immediately once
+    refreshAnalyticsStatus();
+
+    // Then poll every N seconds
+    analyticsPollInterval = setInterval(refreshAnalyticsStatus, ANALYTICS_POLL_INTERVAL_MS);
+}
+
+async function refreshAnalyticsStatus() {
+    if (!currentAnalyticsJobId) {
+        if (analyticsPollInterval) clearInterval(analyticsPollInterval);
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `${ANALYTICS_ENGINE_URL}/pipeline/status/${currentAnalyticsJobId}`
+        );
+
+        if (!response.ok) {
+            console.warn('Failed to poll pipeline status:', response.status);
+            return;
+        }
+
+        const data = await response.json();
+
+        // Render steps
+        renderPipelineSteps(data.steps || []);
+
+        // Update status message
+        const statusEmoji = {
+            running: '⏳',
+            completed: '✅',
+            failed: '❌',
+            partial_failure: '⚠️',
+        };
+        const emoji = statusEmoji[data.status] || '🔄';
+        const duration = data.duration_seconds
+            ? ` (${Math.round(data.duration_seconds)}s)`
+            : '';
+
+        updateAnalyticsContent(
+            `${emoji} Status: <strong>${data.status}</strong>${duration} — Job: ${currentAnalyticsJobId}`
+        );
+
+        // Terminal states: stop polling
+        if (['completed', 'failed', 'partial_failure'].includes(data.status)) {
+            if (analyticsPollInterval) {
+                clearInterval(analyticsPollInterval);
+                analyticsPollInterval = null;
+            }
+
+            // Show results
+            if (data.output_files && Object.keys(data.output_files).length > 0) {
+                renderAnalyticsResults(data);
+            }
+
+            // Show download PDF button if PDF was generated
+            if (data.output_files?.pdf_report) {
+                document.getElementById('downloadAnalyticsPdfBtn').style.display = 'inline-block';
+            }
+
+            if (data.status === 'completed') {
+                showToast('✅ Analytics pipeline completed!', 'success');
+            } else if (data.status === 'failed') {
+                showToast(`❌ Pipeline failed: ${data.error || 'Unknown error'}`, 'error');
+            } else {
+                showToast('⚠️ Pipeline completed with partial failures', 'error');
+            }
+        }
+
+    } catch (error) {
+        console.error('Error polling analytics status:', error);
+    }
+}
+
+function renderPipelineSteps(steps) {
+    const container = document.getElementById('pipelineSteps');
+    container.style.display = 'block';
+
+    const stepLabels = {
+        download_survey_aggregate: 'Download Survey Data',
+        build_survey_context: 'Build Survey Context',
+        run_ei_collection: 'Run EI Collection',
+        fetch_ei_insights: 'Fetch EI Insights',
+        upload_ei_output: 'Upload EI Output',
+        generate_analytics_report: 'Generate Analytics Report',
+        upload_analytics_report: 'Upload Analytics Report',
+        generate_pdf: 'Generate PDF',
+        upload_pdf: 'Upload PDF',
+    };
+
+    const stepIcons = {
+        pending: '⏸',
+        running: '<span class="step-spinner">⏳</span>',
+        completed: '✅',
+        failed: '❌',
+        skipped: '⏭',
+    };
+
+    const stepColors = {
+        pending: '#999',
+        running: '#1976D2',
+        completed: '#2e7d32',
+        failed: '#c62828',
+        skipped: '#888',
+    };
+
+    let html = '<div style="padding: 12px 0;">';
+    steps.forEach((step, idx) => {
+        const label = stepLabels[step.step] || step.step;
+        const icon = stepIcons[step.status] || '⏸';
+        const color = stepColors[step.status] || '#999';
+        const duration = step.duration_seconds
+            ? `<span style="color: #888; font-size: 11px; margin-left: 8px;">${step.duration_seconds.toFixed(1)}s</span>`
+            : '';
+        const message = step.message
+            ? `<div style="font-size: 11px; color: #888; margin-left: 28px; margin-top: 2px;">${step.message}</div>`
+            : '';
+
+        html += `
+            <div style="display: flex; align-items: center; padding: 6px 0;
+                        ${idx < steps.length - 1 ? 'border-bottom: 1px solid #f0f0f0;' : ''}">
+                <span style="width: 24px; text-align: center; font-size: 14px;">${icon}</span>
+                <span style="flex: 1; font-size: 13px; color: ${color}; font-weight: ${step.status === 'running' ? '600' : '400'};">
+                    ${label}
+                </span>
+                ${duration}
+            </div>
+            ${message}
+        `;
+    });
+    html += '</div>';
+
+    // Add CSS for spinner animation if not already added
+    if (!document.getElementById('stepSpinnerStyle')) {
+        const style = document.createElement('style');
+        style.id = 'stepSpinnerStyle';
+        style.textContent = `
+            .step-spinner {
+                display: inline-block;
+                animation: stepSpin 1.2s linear infinite;
+            }
+            @keyframes stepSpin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    container.innerHTML = html;
+}
+
+function renderAnalyticsResults(data) {
+    const resultsDiv = document.getElementById('analyticsResults');
+    const contentDiv = document.getElementById('analyticsResultsContent');
+    resultsDiv.style.display = 'block';
+
+    let html = '';
+
+    // Output files
+    if (data.output_files) {
+        html += '📁 Output Files:\n';
+        for (const [key, uri] of Object.entries(data.output_files)) {
+            html += `  • ${key}: ${uri}\n`;
+        }
+        html += '\n';
+    }
+
+    // Duration
+    if (data.duration_seconds) {
+        html += `⏱ Total Duration: ${Math.round(data.duration_seconds)}s\n\n`;
+    }
+
+    // Analytics report summary (if present)
+    if (data.analytics_report) {
+        html += '📊 Analytics Report Summary:\n';
+        const report = data.analytics_report;
+        if (report.concept_evaluation) {
+            const ce = report.concept_evaluation;
+            html += `  Composite Score: ${ce.composite_score}/100\n`;
+            if (ce.concept_strength) html += `  Strength: ${ce.concept_strength}\n`;
+            if (ce.winner) html += `  Winner: ${ce.winner} (${ce.winner_pick_rate}%)\n`;
+            if (ce.decision_clarity) html += `  Decision Clarity: ${ce.decision_clarity}\n`;
+        }
+        if (report.narrative) {
+            html += `\n  Headline: ${report.narrative.headline}\n`;
+        }
+    }
+
+    // Error
+    if (data.error) {
+        html += `\n❌ Error: ${data.error}\n`;
+    }
+
+    contentDiv.textContent = html;
+}
+
+async function downloadAnalyticsPdf() {
+    if (!currentSurveyData) {
+        showToast('No survey data available', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('downloadAnalyticsPdfBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Getting download link...';
+
+    try {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/surveys/${currentSurveyData.id}/analytics/download/pdf`
+        );
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to get download URL');
+        }
+
+        const data = await response.json();
+
+        // Open signed URL in new tab to trigger download
+        window.open(data.download_url, '_blank');
+        showToast('📄 PDF download started!', 'success');
+
+    } catch (error) {
+        showToast(`❌ Download error: ${error.message}`, 'error');
+        console.error('PDF download error:', error);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📄 Download PDF';
     }
 }
