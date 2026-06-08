@@ -1432,6 +1432,7 @@ async function loadSurveyMetrics(surveyId) {
         const data = await response.json();
         displayMetrics(data);
         metricsCard.style.display = 'block';
+        loadSegmentOptions(surveyId);  // ← populate segmentation dropdowns
 
     } catch (error) {
         console.error('Metrics load error:', error);
@@ -2576,4 +2577,230 @@ async function downloadAnalyticsPdf() {
         btn.disabled = false;
         btn.textContent = '📄 Download PDF';
     }
+}
+
+
+// ═════════════════════════════════════════════════════════
+// METRICS SEGMENTATION
+// ═════════════════════════════════════════════════════════
+//
+// Allows admins to filter the per-question analytics by any profile
+// attribute (e.g. age_group=25-34, gender=female, dietary_preference=vegan).
+// The existing overall metrics are unchanged; results render below them.
+
+let _segmentData = null;  // { total_respondents, segments: { key: [value, ...] } }
+let _segmentSurveyId = null;
+
+async function loadSegmentOptions(surveyId) {
+    _segmentSurveyId = surveyId;
+    _segmentData = null;
+
+    // Reset UI state
+    const filterSection = document.getElementById('segmentFilterSection');
+    const keySelect = document.getElementById('segmentKeySelect');
+    const valueSelect = document.getElementById('segmentValueSelect');
+    const applyBtn = document.getElementById('segmentApplyBtn');
+
+    if (!filterSection) return;
+
+    filterSection.style.display = 'none';
+    keySelect.innerHTML = '<option value="">Attribute…</option>';
+    valueSelect.innerHTML = '<option value="">Value…</option>';
+    valueSelect.disabled = true;
+    if (applyBtn) applyBtn.disabled = true;
+    clearSegmentation();
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/segments`);
+        if (!response.ok) return;  // Silently skip — segmentation is optional UI
+        const data = await response.json();
+
+        if (!data.segments || Object.keys(data.segments).length === 0) return;
+
+        _segmentData = data;
+
+        // Populate key dropdown
+        Object.keys(data.segments).sort().forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key.replace(/_/g, ' ');
+            keySelect.appendChild(opt);
+        });
+
+        filterSection.style.display = 'block';
+    } catch (e) {
+        console.warn('[Segmentation] Failed to load segment options:', e);
+    }
+}
+
+function onSegmentKeyChange() {
+    const keySelect = document.getElementById('segmentKeySelect');
+    const valueSelect = document.getElementById('segmentValueSelect');
+    const applyBtn = document.getElementById('segmentApplyBtn');
+
+    const key = keySelect.value;
+    valueSelect.innerHTML = '<option value="">Value…</option>';
+    valueSelect.disabled = true;
+    if (applyBtn) applyBtn.disabled = true;
+
+    if (!key || !_segmentData || !_segmentData.segments[key]) return;
+
+    _segmentData.segments[key].forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        valueSelect.appendChild(opt);
+    });
+    valueSelect.disabled = false;
+}
+
+function onSegmentValueChange() {
+    const valueSelect = document.getElementById('segmentValueSelect');
+    const applyBtn = document.getElementById('segmentApplyBtn');
+    if (applyBtn) applyBtn.disabled = !valueSelect.value;
+}
+
+async function applySegmentation() {
+    const keySelect = document.getElementById('segmentKeySelect');
+    const valueSelect = document.getElementById('segmentValueSelect');
+    const applyBtn = document.getElementById('segmentApplyBtn');
+    const resultsSection = document.getElementById('segmentedResultsSection');
+    const loadingMsg = document.getElementById('segmentedLoadingMsg');
+    const qaContainer = document.getElementById('segmentedQuestionAnalytics');
+    const title = document.getElementById('segmentedResultsTitle');
+    const badge = document.getElementById('segmentedRespondentBadge');
+    const segmentBadge = document.getElementById('segmentBadge');
+
+    const segKey = keySelect.value;
+    const segVal = valueSelect.value;
+
+    if (!segKey || !segVal || !_segmentSurveyId) return;
+
+    // Show loading state
+    resultsSection.style.display = 'block';
+    if (loadingMsg) loadingMsg.style.display = 'block';
+    qaContainer.innerHTML = '';
+    title.textContent = `Segment: ${segKey.replace(/_/g, ' ')} = "${segVal}"`;
+    if (badge) badge.textContent = '';
+    if (applyBtn) applyBtn.disabled = true;
+
+    try {
+        const url = `${API_BASE_URL}/api/v1/surveys/${_segmentSurveyId}/metrics/segmented?segment_key=${encodeURIComponent(segKey)}&segment_value=${encodeURIComponent(segVal)}`;
+        const response = await fetchWithAuth(url);
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            if (loadingMsg) loadingMsg.style.display = 'none';
+            qaContainer.innerHTML = `<p style="color:#c62828; font-size:0.85rem;">${err.detail || 'No data for this segment.'}</p>`;
+            return;
+        }
+
+        const data = await response.json();
+
+        if (loadingMsg) loadingMsg.style.display = 'none';
+
+        // Header badge: "28 of 95 respondents (29.5%)"
+        const total = _segmentData ? _segmentData.total_respondents : data.total_respondent_count;
+        if (badge) badge.textContent = `${data.respondent_count} of ${total} respondents (${data.percent_of_total}%)`;
+        if (segmentBadge) {
+            segmentBadge.textContent = `Filtered: ${segKey.replace(/_/g, ' ')} = "${segVal}" — ${data.respondent_count} respondents`;
+            segmentBadge.style.display = 'block';
+        }
+
+        // Render question analytics
+        if (!data.question_analytics || data.question_analytics.length === 0) {
+            qaContainer.innerHTML = '<p style="color:#6b7280; font-size:0.85rem;">No question data available for this segment.</p>';
+            return;
+        }
+
+        qaContainer.innerHTML = data.question_analytics.map(q => renderSegmentedQuestionCard(q)).join('');
+
+    } catch (e) {
+        if (loadingMsg) loadingMsg.style.display = 'none';
+        qaContainer.innerHTML = `<p style="color:#c62828; font-size:0.85rem;">Failed to load segment: ${e.message}</p>`;
+        console.error('[Segmentation] applySegmentation error:', e);
+    } finally {
+        if (applyBtn) applyBtn.disabled = false;
+    }
+}
+
+function clearSegmentation() {
+    const resultsSection = document.getElementById('segmentedResultsSection');
+    const segmentBadge = document.getElementById('segmentBadge');
+    const keySelect = document.getElementById('segmentKeySelect');
+    const valueSelect = document.getElementById('segmentValueSelect');
+    const applyBtn = document.getElementById('segmentApplyBtn');
+
+    if (resultsSection) resultsSection.style.display = 'none';
+    if (segmentBadge) { segmentBadge.textContent = ''; segmentBadge.style.display = 'none'; }
+    if (keySelect) keySelect.value = '';
+    if (valueSelect) { valueSelect.innerHTML = '<option value="">Value…</option>'; valueSelect.disabled = true; }
+    if (applyBtn) applyBtn.disabled = true;
+}
+
+function renderSegmentedQuestionCard(q) {
+    const analytics = q.analytics || {};
+    let bodyHtml = '';
+
+    if (q.question_type === 'rating') {
+        const dist = analytics.distribution || {};
+        const mean = analytics.mean != null ? `Avg: ${analytics.mean}` : '';
+        const bars = Object.entries(dist).map(([score, info]) => `
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span style="width:18px; text-align:right; font-size:0.8rem; color:#374151;">${score}</span>
+                <div style="flex:1; background:#e5e7eb; border-radius:4px; height:14px; overflow:hidden;">
+                    <div style="width:${info.percent}%; background:#3b82f6; height:100%; border-radius:4px;"></div>
+                </div>
+                <span style="font-size:0.78rem; color:#6b7280; width:70px;">${info.percent}% (n=${info.count})</span>
+            </div>`).join('');
+        bodyHtml = `<div style="font-size:0.78rem; color:#6b7280; margin-bottom:6px;">${mean}</div>${bars}`;
+
+    } else if (q.question_type === 'mcq' || q.question_type === 'single_select' || q.question_type === 'multi_select') {
+        const opts = analytics.options || {};
+        const rows = Object.values(opts).sort((a, b) => b.percent - a.percent).map(opt => `
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span style="width:120px; font-size:0.8rem; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeSegHtml(opt.label)}">${escapeSegHtml(opt.label)}</span>
+                <div style="flex:1; background:#e5e7eb; border-radius:4px; height:14px; overflow:hidden;">
+                    <div style="width:${opt.percent}%; background:#8b5cf6; height:100%; border-radius:4px;"></div>
+                </div>
+                <span style="font-size:0.78rem; color:#6b7280; width:70px;">${opt.percent}% (n=${opt.count})</span>
+            </div>`).join('');
+        bodyHtml = rows || '<span style="color:#9ca3af; font-size:0.8rem;">No data</span>';
+
+    } else if (q.question_type === 'slider') {
+        bodyHtml = `<span style="font-size:0.85rem; color:#374151;">Mean: <strong>${analytics.mean ?? '—'}</strong></span>`;
+
+    } else if (q.question_type === 'ranking') {
+        const items = Object.values(analytics.items || {}).sort((a, b) => a.avg_rank - b.avg_rank);
+        bodyHtml = items.map((item, i) => `
+            <div style="font-size:0.82rem; margin-bottom:3px;">
+                <span style="color:#6b7280; width:22px; display:inline-block;">${i + 1}.</span>
+                <span style="color:#374151;">${escapeSegHtml(item.label)}</span>
+                <span style="color:#9ca3af; font-size:0.75rem;"> (avg rank ${item.avg_rank})</span>
+            </div>`).join('');
+
+    } else if (q.question_type === 'text') {
+        bodyHtml = `<span style="color:#6b7280; font-size:0.82rem;">📝 ${analytics.response_count || 0} open-ended response(s)</span>`;
+
+    } else {
+        bodyHtml = `<span style="color:#9ca3af; font-size:0.8rem;">No renderer for type "${q.question_type}"</span>`;
+    }
+
+    return `
+        <div style="background:#fff; border:1px solid #dbeafe; border-radius:6px; padding:12px; margin-bottom:10px;">
+            <div style="font-size:0.82rem; color:#0369a1; font-weight:600; margin-bottom:8px;">
+                ${escapeSegHtml(q.question_text)}
+                <span style="font-weight:400; color:#6b7280;"> — ${q.total_responses} response${q.total_responses !== 1 ? 's' : ''}</span>
+            </div>
+            ${bodyHtml}
+        </div>`;
+}
+
+function escapeSegHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
