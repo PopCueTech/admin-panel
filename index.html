@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="auth.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Auth Screen -->
@@ -145,6 +146,15 @@
                             <span><strong id="activeUsers">-</strong> Active</span>
                             <span><strong id="newSignups">-</strong> New Signups</span>
                         </div>
+                        <div class="stat-sub">
+                            <span><strong id="verifiedUsers">-</strong> Verified</span>
+                            <span><strong id="unverifiedUsers">-</strong> Unverified</span>
+                        </div>
+                        <div class="stat-sub">
+                            <span><strong id="oauthUsers">-</strong> OAuth</span>
+                            <span><strong id="universityUsers">-</strong> University</span>
+                        </div>
+                        <div class="stat-metric">Verified: <strong id="verificationRate">-</strong> &nbsp;|&nbsp; Profile: <strong id="profileRate">-</strong></div>
                         <div class="stat-growth" id="userGrowth">-</div>
                     </div>
 
@@ -198,6 +208,46 @@
                             <span><strong id="newReferrals">-</strong> New</span>
                         </div>
                         <div class="stat-metric">Conversion: <strong id="referralConversion">-</strong></div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 1: Signups line + Verification donut -->
+                <div class="charts-grid charts-grid-2-1">
+                    <div class="chart-card">
+                        <h3>User Signups — Last 30 Days</h3>
+                        <canvas id="signupsChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Verification Status</h3>
+                        <canvas id="verificationChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Charts Row 2: Gender, Age groups, Login recency -->
+                <div class="charts-grid charts-grid-3">
+                    <div class="chart-card">
+                        <h3>Gender Distribution</h3>
+                        <canvas id="genderChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Age Groups</h3>
+                        <canvas id="ageChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Login Recency</h3>
+                        <canvas id="recencyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Charts Row 3: Rewards trend + Survey funnel -->
+                <div class="charts-grid charts-grid-2-1">
+                    <div class="chart-card">
+                        <h3>Daily Rewards — Last 30 Days</h3>
+                        <canvas id="rewardsChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Survey Completion Funnel</h3>
+                        <canvas id="funnelChart"></canvas>
                     </div>
                 </div>
 

@@ -18,6 +18,9 @@ let currentSurveyMetrics = null;
 let refreshTimer = null;
 let allSurveys = [];  // Store for client-side filtering
 
+let signupsChart = null, verificationChart = null, genderChart = null;
+let ageChart = null, recencyChart = null, rewardsChart = null, funnelChart = null;
+
 // Analytics engine configuration
 const ANALYTICS_ENGINE_URL = 'https://analytics-engine-p-812411253957.us-central1.run.app';
 const ANALYTICS_POLL_INTERVAL_MS = 5000;
@@ -154,6 +157,21 @@ function displayDashboard(data) {
     document.getElementById('activeUsers').textContent = data.users.active.toLocaleString();
     document.getElementById('newSignups').textContent = data.users.new_signups.toLocaleString();
     document.getElementById('userGrowth').textContent = `${data.users.growth_rate >= 0 ? '+' : ''}${data.users.growth_rate.toFixed(1)}%`;
+    document.getElementById('verifiedUsers').textContent = data.users.verified.toLocaleString();
+    document.getElementById('unverifiedUsers').textContent = data.users.unverified.toLocaleString();
+    document.getElementById('verificationRate').textContent = `${data.users.verification_rate.toFixed(1)}%`;
+    document.getElementById('oauthUsers').textContent = data.users.oauth_users.toLocaleString();
+    document.getElementById('universityUsers').textContent = data.users.university_users.toLocaleString();
+    document.getElementById('profileRate').textContent = `${data.users.profile_completion_rate.toFixed(1)}%`;
+
+    // Charts
+    renderSignupsChart(data.users.daily_signups);
+    renderVerificationChart(data.users.verified, data.users.unverified);
+    renderGenderChart(data.users.gender_dist);
+    renderAgeChart(data.users.age_dist);
+    renderRecencyChart(data.users.login_recency);
+    renderRewardsChart(data.daily_rewards);
+    renderFunnelChart(data.survey_funnel);
 
     // Survey metrics
     document.getElementById('totalSurveys').textContent = data.surveys.total;
@@ -212,6 +230,181 @@ async function refreshDashboard() {
         console.error('Refresh error:', error);
         showToast(`Refresh failed: ${error.message}`, 'error');
     }
+}
+
+// ═════════════════════════════════════════════════════════
+// DASHBOARD CHARTS
+// ═════════════════════════════════════════════════════════
+
+function destroyChart(chart) { if (chart) chart.destroy(); }
+
+function renderSignupsChart(daily) {
+    destroyChart(signupsChart);
+    if (!daily || !daily.length) return;
+    signupsChart = new Chart(document.getElementById('signupsChart'), {
+        type: 'line',
+        data: {
+            labels: daily.map(d => d.date),
+            datasets: [{
+                label: 'Signups',
+                data: daily.map(d => d.count),
+                borderColor: '#2196F3',
+                backgroundColor: 'rgba(33,150,243,0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+}
+
+function renderVerificationChart(verified, unverified) {
+    destroyChart(verificationChart);
+    verificationChart = new Chart(document.getElementById('verificationChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Verified', 'Unverified'],
+            datasets: [{
+                data: [verified, unverified],
+                backgroundColor: ['#4CAF50', '#FF5722'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function renderGenderChart(dist) {
+    destroyChart(genderChart);
+    if (!dist || !Object.keys(dist).length) return;
+    const colorMap = { Male: '#2196F3', Female: '#E91E63', Other: '#FF9800', Unknown: '#9E9E9E' };
+    const labels = Object.keys(dist);
+    genderChart = new Chart(document.getElementById('genderChart'), {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: labels.map(l => dist[l]),
+                backgroundColor: labels.map(l => colorMap[l] || '#9E9E9E'),
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function renderAgeChart(dist) {
+    destroyChart(ageChart);
+    if (!dist || !Object.keys(dist).length) return;
+    const order = ['18-24', '25-34', '35-44', '45+', 'Unknown'];
+    const labels = order.filter(k => dist[k] !== undefined);
+    ageChart = new Chart(document.getElementById('ageChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Users',
+                data: labels.map(l => dist[l] || 0),
+                backgroundColor: '#7C4DFF',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+}
+
+function renderRecencyChart(recency) {
+    destroyChart(recencyChart);
+    if (!recency) return;
+    recencyChart = new Chart(document.getElementById('recencyChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Active <7d', 'Active 8–30d', 'Dormant >30d'],
+            datasets: [{
+                data: [recency.active_7d, recency.active_8_30d, recency.dormant],
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+
+function renderRewardsChart(dailyRewards) {
+    destroyChart(rewardsChart);
+    if (!dailyRewards) return;
+    const allDates = [...new Set([
+        ...dailyRewards.earned.map(d => d.date),
+        ...dailyRewards.redeemed.map(d => d.date)
+    ])].sort();
+    if (!allDates.length) return;
+    const earnedMap = Object.fromEntries(dailyRewards.earned.map(d => [d.date, d.count]));
+    const redeemedMap = Object.fromEntries(dailyRewards.redeemed.map(d => [d.date, d.count]));
+    rewardsChart = new Chart(document.getElementById('rewardsChart'), {
+        type: 'line',
+        data: {
+            labels: allDates,
+            datasets: [
+                {
+                    label: 'Earned',
+                    data: allDates.map(d => earnedMap[d] || 0),
+                    borderColor: '#4CAF50',
+                    backgroundColor: 'rgba(76,175,80,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3
+                },
+                {
+                    label: 'Redeemed',
+                    data: allDates.map(d => redeemedMap[d] || 0),
+                    borderColor: '#FF5722',
+                    backgroundColor: 'rgba(255,87,34,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function renderFunnelChart(funnel) {
+    destroyChart(funnelChart);
+    if (!funnel) return;
+    funnelChart = new Chart(document.getElementById('funnelChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Completed', 'In Progress', 'Abandoned'],
+            datasets: [{
+                data: [funnel.completed || 0, funnel.in_progress || 0, funnel.abandoned || 0],
+                backgroundColor: ['#4CAF50', '#2196F3', '#FF5722'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
 }
 
 function hideAllSections() {
