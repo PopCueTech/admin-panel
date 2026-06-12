@@ -18,9 +18,6 @@ let currentSurveyMetrics = null;
 let refreshTimer = null;
 let allSurveys = [];  // Store for client-side filtering
 
-let signupsChart = null, verificationChart = null, genderChart = null;
-let ageChart = null, recencyChart = null, rewardsChart = null, funnelChart = null;
-
 // Analytics engine configuration
 const ANALYTICS_ENGINE_URL = 'https://analytics-engine-p-812411253957.us-central1.run.app';
 const ANALYTICS_POLL_INTERVAL_MS = 5000;
@@ -157,21 +154,6 @@ function displayDashboard(data) {
     document.getElementById('activeUsers').textContent = data.users.active.toLocaleString();
     document.getElementById('newSignups').textContent = data.users.new_signups.toLocaleString();
     document.getElementById('userGrowth').textContent = `${data.users.growth_rate >= 0 ? '+' : ''}${data.users.growth_rate.toFixed(1)}%`;
-    document.getElementById('verifiedUsers').textContent = data.users.verified.toLocaleString();
-    document.getElementById('unverifiedUsers').textContent = data.users.unverified.toLocaleString();
-    document.getElementById('verificationRate').textContent = `${data.users.verification_rate.toFixed(1)}%`;
-    document.getElementById('oauthUsers').textContent = data.users.oauth_users.toLocaleString();
-    document.getElementById('universityUsers').textContent = data.users.university_users.toLocaleString();
-    document.getElementById('profileRate').textContent = `${data.users.profile_completion_rate.toFixed(1)}%`;
-
-    // Charts
-    renderSignupsChart(data.users.daily_signups);
-    renderVerificationChart(data.users.verified, data.users.unverified);
-    renderGenderChart(data.users.gender_dist);
-    renderAgeChart(data.users.age_dist);
-    renderRecencyChart(data.users.login_recency);
-    renderRewardsChart(data.daily_rewards);
-    renderFunnelChart(data.survey_funnel);
 
     // Survey metrics
     document.getElementById('totalSurveys').textContent = data.surveys.total;
@@ -230,181 +212,6 @@ async function refreshDashboard() {
         console.error('Refresh error:', error);
         showToast(`Refresh failed: ${error.message}`, 'error');
     }
-}
-
-// ═════════════════════════════════════════════════════════
-// DASHBOARD CHARTS
-// ═════════════════════════════════════════════════════════
-
-function destroyChart(chart) { if (chart) chart.destroy(); }
-
-function renderSignupsChart(daily) {
-    destroyChart(signupsChart);
-    if (!daily || !daily.length) return;
-    signupsChart = new Chart(document.getElementById('signupsChart'), {
-        type: 'line',
-        data: {
-            labels: daily.map(d => d.date),
-            datasets: [{
-                label: 'Signups',
-                data: daily.map(d => d.count),
-                borderColor: '#2196F3',
-                backgroundColor: 'rgba(33,150,243,0.1)',
-                fill: true,
-                tension: 0.4,
-                pointRadius: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-        }
-    });
-}
-
-function renderVerificationChart(verified, unverified) {
-    destroyChart(verificationChart);
-    verificationChart = new Chart(document.getElementById('verificationChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Verified', 'Unverified'],
-            datasets: [{
-                data: [verified, unverified],
-                backgroundColor: ['#4CAF50', '#FF5722'],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-}
-
-function renderGenderChart(dist) {
-    destroyChart(genderChart);
-    if (!dist || !Object.keys(dist).length) return;
-    const colorMap = { Male: '#2196F3', Female: '#E91E63', Other: '#FF9800', Unknown: '#9E9E9E' };
-    const labels = Object.keys(dist);
-    genderChart = new Chart(document.getElementById('genderChart'), {
-        type: 'doughnut',
-        data: {
-            labels,
-            datasets: [{
-                data: labels.map(l => dist[l]),
-                backgroundColor: labels.map(l => colorMap[l] || '#9E9E9E'),
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-}
-
-function renderAgeChart(dist) {
-    destroyChart(ageChart);
-    if (!dist || !Object.keys(dist).length) return;
-    const order = ['18-24', '25-34', '35-44', '45+', 'Unknown'];
-    const labels = order.filter(k => dist[k] !== undefined);
-    ageChart = new Chart(document.getElementById('ageChart'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Users',
-                data: labels.map(l => dist[l] || 0),
-                backgroundColor: '#7C4DFF',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            indexAxis: 'y',
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
-        }
-    });
-}
-
-function renderRecencyChart(recency) {
-    destroyChart(recencyChart);
-    if (!recency) return;
-    recencyChart = new Chart(document.getElementById('recencyChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Active <7d', 'Active 8–30d', 'Dormant >30d'],
-            datasets: [{
-                data: [recency.active_7d, recency.active_8_30d, recency.dormant],
-                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-}
-
-function renderRewardsChart(dailyRewards) {
-    destroyChart(rewardsChart);
-    if (!dailyRewards) return;
-    const allDates = [...new Set([
-        ...dailyRewards.earned.map(d => d.date),
-        ...dailyRewards.redeemed.map(d => d.date)
-    ])].sort();
-    if (!allDates.length) return;
-    const earnedMap = Object.fromEntries(dailyRewards.earned.map(d => [d.date, d.count]));
-    const redeemedMap = Object.fromEntries(dailyRewards.redeemed.map(d => [d.date, d.count]));
-    rewardsChart = new Chart(document.getElementById('rewardsChart'), {
-        type: 'line',
-        data: {
-            labels: allDates,
-            datasets: [
-                {
-                    label: 'Earned',
-                    data: allDates.map(d => earnedMap[d] || 0),
-                    borderColor: '#4CAF50',
-                    backgroundColor: 'rgba(76,175,80,0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3
-                },
-                {
-                    label: 'Redeemed',
-                    data: allDates.map(d => redeemedMap[d] || 0),
-                    borderColor: '#FF5722',
-                    backgroundColor: 'rgba(255,87,34,0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top' } },
-            scales: { y: { beginAtZero: true } }
-        }
-    });
-}
-
-function renderFunnelChart(funnel) {
-    destroyChart(funnelChart);
-    if (!funnel) return;
-    funnelChart = new Chart(document.getElementById('funnelChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Completed', 'In Progress', 'Abandoned'],
-            datasets: [{
-                data: [funnel.completed || 0, funnel.in_progress || 0, funnel.abandoned || 0],
-                backgroundColor: ['#4CAF50', '#2196F3', '#FF5722'],
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-        }
-    });
 }
 
 function hideAllSections() {
@@ -1625,7 +1432,6 @@ async function loadSurveyMetrics(surveyId) {
         const data = await response.json();
         displayMetrics(data);
         metricsCard.style.display = 'block';
-        loadSegmentOptions(surveyId);  // ← populate segmentation dropdowns
 
     } catch (error) {
         console.error('Metrics load error:', error);
@@ -2485,7 +2291,11 @@ async function startAnalyticsPipeline() {
         showToast('✅ Survey summary uploaded. Starting analytics pipeline...', 'success');
         updateAnalyticsContent('✅ Uploaded to GCS. Starting analytics pipeline...');
 
-        // Step 2: Trigger analytics pipeline
+        // Step 2: Generate a client-side job_id so we can poll immediately
+        const jobId = `pipeline_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+        currentAnalyticsJobId = jobId;
+
+        // Step 3: Trigger analytics pipeline (blocking POST — runs in background)
         const pipelineBody = {
             survey_id: surveyId,
             signed_url: signedUrl,
@@ -2493,32 +2303,79 @@ async function startAnalyticsPipeline() {
             exec_summary_weights: { cs, bq, pq },
             survey_title: currentSurveyData.title || null,
             collection_duration_minutes: eiDuration,
+            job_id: jobId,
         };
 
-        const pipelineResponse = await fetch(`${ANALYTICS_ENGINE_URL}/pipeline/run`, {
+        // Fire the POST in the background — it blocks for ~16-18 min
+        const pipelinePromise = fetch(`${ANALYTICS_ENGINE_URL}/pipeline/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(pipelineBody),
+            signal: AbortSignal.timeout(2400000), // 40 min timeout
+        }).then(async (response) => {
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || `Pipeline failed (HTTP ${response.status})`);
+            }
+            const result = await response.json();
+
+            // POST completed — stop polling and show final result
+            if (analyticsPollInterval) {
+                clearInterval(analyticsPollInterval);
+                analyticsPollInterval = null;
+            }
+
+            if (result.status === 'failed') {
+                showToast(`❌ Pipeline failed: ${result.error || 'Unknown error'}`, 'error');
+                updateAnalyticsContent(`❌ Pipeline failed: ${result.error || 'Unknown error'}`);
+            } else if (result.status === 'partial_failure') {
+                showToast('⚠️ Pipeline completed with partial failures', 'error');
+            } else {
+                showToast('✅ Analytics pipeline completed!', 'success');
+            }
+
+            // Render final state from the POST response
+            renderPipelineSteps(result.steps || []);
+            if (result.output_files && Object.keys(result.output_files).length > 0) {
+                renderAnalyticsResults(result);
+            }
+            if (result.output_files?.pdf_report) {
+                document.getElementById('downloadAnalyticsPdfBtn').style.display = 'inline-block';
+            }
+
+            const duration = result.duration_seconds
+                ? ` (${Math.round(result.duration_seconds)}s)`
+                : '';
+            updateAnalyticsContent(
+                `✅ Status: <strong>${result.status}</strong>${duration} — Job: ${jobId}`
+            );
+
+            return result;
+        }).catch((err) => {
+            // Only surface if this job is still active
+            if (currentAnalyticsJobId === jobId) {
+                showToast(`❌ Pipeline error: ${err.message}`, 'error');
+                updateAnalyticsContent(`❌ Pipeline error: ${err.message}`);
+                console.error('Pipeline POST error:', err);
+            }
         });
 
-        if (!pipelineResponse.ok) {
-            const err = await pipelineResponse.json().catch(() => ({}));
-            throw new Error(err.detail || `Pipeline failed to start (HTTP ${pipelineResponse.status})`);
-        }
-
-        const pipelineData = await pipelineResponse.json();
-        currentAnalyticsJobId = pipelineData.job_id;
-
-        showToast(`🚀 Pipeline started! Job: ${currentAnalyticsJobId}`, 'success');
+        // Step 4: Show progress UI immediately
+        showToast(`🚀 Pipeline started! Job: ${jobId}`, 'success');
         closeAnalyticsModal();
 
-        // Show analytics card and start polling
         document.getElementById('analyticsCard').style.display = 'block';
         document.getElementById('analyticsRefreshBtn').style.display = 'inline-block';
         document.getElementById('pipelineSteps').style.display = 'block';
 
-        updateAnalyticsContent(`🚀 Pipeline running — Job: ${currentAnalyticsJobId}`);
-        startAnalyticsPolling();
+        updateAnalyticsContent(`🚀 Pipeline running — Job: ${jobId}`);
+
+        // Step 5: Wait 3s for Firestore job record to be created, then start polling
+        setTimeout(() => {
+            if (currentAnalyticsJobId === jobId) {
+                startAnalyticsPolling();
+            }
+        }, 3000);
 
     } catch (error) {
         showToast(`❌ Analytics error: ${error.message}`, 'error');
@@ -2770,230 +2627,4 @@ async function downloadAnalyticsPdf() {
         btn.disabled = false;
         btn.textContent = '📄 Download PDF';
     }
-}
-
-
-// ═════════════════════════════════════════════════════════
-// METRICS SEGMENTATION
-// ═════════════════════════════════════════════════════════
-//
-// Allows admins to filter the per-question analytics by any profile
-// attribute (e.g. age_group=25-34, gender=female, dietary_preference=vegan).
-// The existing overall metrics are unchanged; results render below them.
-
-let _segmentData = null;  // { total_respondents, segments: { key: [value, ...] } }
-let _segmentSurveyId = null;
-
-async function loadSegmentOptions(surveyId) {
-    _segmentSurveyId = surveyId;
-    _segmentData = null;
-
-    // Reset UI state
-    const filterSection = document.getElementById('segmentFilterSection');
-    const keySelect = document.getElementById('segmentKeySelect');
-    const valueSelect = document.getElementById('segmentValueSelect');
-    const applyBtn = document.getElementById('segmentApplyBtn');
-
-    if (!filterSection) return;
-
-    filterSection.style.display = 'none';
-    keySelect.innerHTML = '<option value="">Attribute…</option>';
-    valueSelect.innerHTML = '<option value="">Value…</option>';
-    valueSelect.disabled = true;
-    if (applyBtn) applyBtn.disabled = true;
-    clearSegmentation();
-
-    try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/segments`);
-        if (!response.ok) return;  // Silently skip — segmentation is optional UI
-        const data = await response.json();
-
-        if (!data.segments || Object.keys(data.segments).length === 0) return;
-
-        _segmentData = data;
-
-        // Populate key dropdown
-        Object.keys(data.segments).sort().forEach(key => {
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = key.replace(/_/g, ' ');
-            keySelect.appendChild(opt);
-        });
-
-        filterSection.style.display = 'block';
-    } catch (e) {
-        console.warn('[Segmentation] Failed to load segment options:', e);
-    }
-}
-
-function onSegmentKeyChange() {
-    const keySelect = document.getElementById('segmentKeySelect');
-    const valueSelect = document.getElementById('segmentValueSelect');
-    const applyBtn = document.getElementById('segmentApplyBtn');
-
-    const key = keySelect.value;
-    valueSelect.innerHTML = '<option value="">Value…</option>';
-    valueSelect.disabled = true;
-    if (applyBtn) applyBtn.disabled = true;
-
-    if (!key || !_segmentData || !_segmentData.segments[key]) return;
-
-    _segmentData.segments[key].forEach(val => {
-        const opt = document.createElement('option');
-        opt.value = val;
-        opt.textContent = val;
-        valueSelect.appendChild(opt);
-    });
-    valueSelect.disabled = false;
-}
-
-function onSegmentValueChange() {
-    const valueSelect = document.getElementById('segmentValueSelect');
-    const applyBtn = document.getElementById('segmentApplyBtn');
-    if (applyBtn) applyBtn.disabled = !valueSelect.value;
-}
-
-async function applySegmentation() {
-    const keySelect = document.getElementById('segmentKeySelect');
-    const valueSelect = document.getElementById('segmentValueSelect');
-    const applyBtn = document.getElementById('segmentApplyBtn');
-    const resultsSection = document.getElementById('segmentedResultsSection');
-    const loadingMsg = document.getElementById('segmentedLoadingMsg');
-    const qaContainer = document.getElementById('segmentedQuestionAnalytics');
-    const title = document.getElementById('segmentedResultsTitle');
-    const badge = document.getElementById('segmentedRespondentBadge');
-    const segmentBadge = document.getElementById('segmentBadge');
-
-    const segKey = keySelect.value;
-    const segVal = valueSelect.value;
-
-    if (!segKey || !segVal || !_segmentSurveyId) return;
-
-    // Show loading state
-    resultsSection.style.display = 'block';
-    if (loadingMsg) loadingMsg.style.display = 'block';
-    qaContainer.innerHTML = '';
-    title.textContent = `Segment: ${segKey.replace(/_/g, ' ')} = "${segVal}"`;
-    if (badge) badge.textContent = '';
-    if (applyBtn) applyBtn.disabled = true;
-
-    try {
-        const url = `${API_BASE_URL}/api/v1/surveys/${_segmentSurveyId}/metrics/segmented?segment_key=${encodeURIComponent(segKey)}&segment_value=${encodeURIComponent(segVal)}`;
-        const response = await fetchWithAuth(url);
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            if (loadingMsg) loadingMsg.style.display = 'none';
-            qaContainer.innerHTML = `<p style="color:#c62828; font-size:0.85rem;">${err.detail || 'No data for this segment.'}</p>`;
-            return;
-        }
-
-        const data = await response.json();
-
-        if (loadingMsg) loadingMsg.style.display = 'none';
-
-        // Header badge: "28 of 95 respondents (29.5%)"
-        const total = _segmentData ? _segmentData.total_respondents : data.total_respondent_count;
-        if (badge) badge.textContent = `${data.respondent_count} of ${total} respondents (${data.percent_of_total}%)`;
-        if (segmentBadge) {
-            segmentBadge.textContent = `Filtered: ${segKey.replace(/_/g, ' ')} = "${segVal}" — ${data.respondent_count} respondents`;
-            segmentBadge.style.display = 'block';
-        }
-
-        // Render question analytics
-        if (!data.question_analytics || data.question_analytics.length === 0) {
-            qaContainer.innerHTML = '<p style="color:#6b7280; font-size:0.85rem;">No question data available for this segment.</p>';
-            return;
-        }
-
-        qaContainer.innerHTML = data.question_analytics.map(q => renderSegmentedQuestionCard(q)).join('');
-
-    } catch (e) {
-        if (loadingMsg) loadingMsg.style.display = 'none';
-        qaContainer.innerHTML = `<p style="color:#c62828; font-size:0.85rem;">Failed to load segment: ${e.message}</p>`;
-        console.error('[Segmentation] applySegmentation error:', e);
-    } finally {
-        if (applyBtn) applyBtn.disabled = false;
-    }
-}
-
-function clearSegmentation() {
-    const resultsSection = document.getElementById('segmentedResultsSection');
-    const segmentBadge = document.getElementById('segmentBadge');
-    const keySelect = document.getElementById('segmentKeySelect');
-    const valueSelect = document.getElementById('segmentValueSelect');
-    const applyBtn = document.getElementById('segmentApplyBtn');
-
-    if (resultsSection) resultsSection.style.display = 'none';
-    if (segmentBadge) { segmentBadge.textContent = ''; segmentBadge.style.display = 'none'; }
-    if (keySelect) keySelect.value = '';
-    if (valueSelect) { valueSelect.innerHTML = '<option value="">Value…</option>'; valueSelect.disabled = true; }
-    if (applyBtn) applyBtn.disabled = true;
-}
-
-function renderSegmentedQuestionCard(q) {
-    const analytics = q.analytics || {};
-    let bodyHtml = '';
-
-    if (q.question_type === 'rating') {
-        const dist = analytics.distribution || {};
-        const mean = analytics.mean != null ? `Avg: ${analytics.mean}` : '';
-        const bars = Object.entries(dist).map(([score, info]) => `
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span style="width:18px; text-align:right; font-size:0.8rem; color:#374151;">${score}</span>
-                <div style="flex:1; background:#e5e7eb; border-radius:4px; height:14px; overflow:hidden;">
-                    <div style="width:${info.percent}%; background:#3b82f6; height:100%; border-radius:4px;"></div>
-                </div>
-                <span style="font-size:0.78rem; color:#6b7280; width:70px;">${info.percent}% (n=${info.count})</span>
-            </div>`).join('');
-        bodyHtml = `<div style="font-size:0.78rem; color:#6b7280; margin-bottom:6px;">${mean}</div>${bars}`;
-
-    } else if (q.question_type === 'mcq' || q.question_type === 'single_select' || q.question_type === 'multi_select') {
-        const opts = analytics.options || {};
-        const rows = Object.values(opts).sort((a, b) => b.percent - a.percent).map(opt => `
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span style="width:120px; font-size:0.8rem; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeSegHtml(opt.label)}">${escapeSegHtml(opt.label)}</span>
-                <div style="flex:1; background:#e5e7eb; border-radius:4px; height:14px; overflow:hidden;">
-                    <div style="width:${opt.percent}%; background:#8b5cf6; height:100%; border-radius:4px;"></div>
-                </div>
-                <span style="font-size:0.78rem; color:#6b7280; width:70px;">${opt.percent}% (n=${opt.count})</span>
-            </div>`).join('');
-        bodyHtml = rows || '<span style="color:#9ca3af; font-size:0.8rem;">No data</span>';
-
-    } else if (q.question_type === 'slider') {
-        bodyHtml = `<span style="font-size:0.85rem; color:#374151;">Mean: <strong>${analytics.mean ?? '—'}</strong></span>`;
-
-    } else if (q.question_type === 'ranking') {
-        const items = Object.values(analytics.items || {}).sort((a, b) => a.avg_rank - b.avg_rank);
-        bodyHtml = items.map((item, i) => `
-            <div style="font-size:0.82rem; margin-bottom:3px;">
-                <span style="color:#6b7280; width:22px; display:inline-block;">${i + 1}.</span>
-                <span style="color:#374151;">${escapeSegHtml(item.label)}</span>
-                <span style="color:#9ca3af; font-size:0.75rem;"> (avg rank ${item.avg_rank})</span>
-            </div>`).join('');
-
-    } else if (q.question_type === 'text') {
-        bodyHtml = `<span style="color:#6b7280; font-size:0.82rem;">📝 ${analytics.response_count || 0} open-ended response(s)</span>`;
-
-    } else {
-        bodyHtml = `<span style="color:#9ca3af; font-size:0.8rem;">No renderer for type "${q.question_type}"</span>`;
-    }
-
-    return `
-        <div style="background:#fff; border:1px solid #dbeafe; border-radius:6px; padding:12px; margin-bottom:10px;">
-            <div style="font-size:0.82rem; color:#0369a1; font-weight:600; margin-bottom:8px;">
-                ${escapeSegHtml(q.question_text)}
-                <span style="font-weight:400; color:#6b7280;"> — ${q.total_responses} response${q.total_responses !== 1 ? 's' : ''}</span>
-            </div>
-            ${bodyHtml}
-        </div>`;
-}
-
-function escapeSegHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
 }

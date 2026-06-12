@@ -92,7 +92,7 @@ async function loadProfileQuestionnairesList() {
         if (profileSurveys.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align:center; padding:40px; color:#999;">
+                    <td colspan="7" style="text-align:center; padding:40px; color:#999;">
                         No profile questionnaires yet. Click <strong>+ Create profile questionnaire</strong> to add one.
                     </td>
                 </tr>`;
@@ -111,11 +111,17 @@ async function loadProfileQuestionnairesList() {
                 <td style="font-size:12px; color:#666;">
                     ${s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A'}
                 </td>
+                <td>
+                    ${!s.is_active
+                        ? `<button class="btn-ghost btn-ghost-brand" onclick="publishProfileQuestionnaire('${s.id}')">Publish</button>`
+                        : `<button class="btn-ghost" onclick="unpublishProfileQuestionnaire('${s.id}')" style="color:#c62828;">Unpublish</button>`
+                    }
+                </td>
             </tr>
         `).join('');
     } catch (error) {
         tbody.innerHTML = `
-            <tr><td colspan="6" style="text-align:center; padding:40px; color:#c62828;">
+            <tr><td colspan="7" style="text-align:center; padding:40px; color:#c62828;">
                 Failed to load: ${escapePqHtml(error.message)}
             </td></tr>`;
         console.error('[profile_questionnaire] list load failed:', error);
@@ -361,6 +367,46 @@ async function submitProfileQuestionnaire() {
         await loadProfileQuestionnairesList();
     } catch (e) {
         showToast(`Failed: ${e.message}`, 'error');
+    }
+}
+
+// ─── Publish / Unpublish ─────────────────────────────────────────────
+
+async function publishProfileQuestionnaire(surveyId) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        showToast(`✅ ${data.message || 'Published'}`, 'success');
+        await loadProfileQuestionnairesList();
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+        console.error('[profile_questionnaire] publish failed:', e);
+    }
+}
+
+async function unpublishProfileQuestionnaire(surveyId) {
+    if (!confirm('Unpublish this profile questionnaire? Users won\'t see it anymore.')) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/unpublish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+        showToast('Questionnaire moved to draft', 'success');
+        await loadProfileQuestionnairesList();
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+        console.error('[profile_questionnaire] unpublish failed:', e);
     }
 }
 
