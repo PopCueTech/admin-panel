@@ -754,6 +754,33 @@
                         <button type="button" class="btn btn-secondary" onclick="closeProfileQuestionnaireForm()">Cancel</button>
                     </div>
                 </div>
+
+                <!-- DETAIL / REVIEW view -->
+                <div id="profileQuestionnaireDetailView" style="display:none; max-width:900px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeProfileQuestionnaireDetail()">← Back to list</button>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" id="pqDetailPublishBtn" class="btn btn-primary btn-sm" onclick="publishProfileQuestionnaire(window._pqDetailId)">Publish</button>
+                            <button type="button" id="pqDetailUnpublishBtn" class="btn btn-secondary btn-sm" style="color:#c62828;" onclick="unpublishProfileQuestionnaire(window._pqDetailId)">Unpublish</button>
+                        </div>
+                    </div>
+
+                    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:20px; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                            <h2 id="pqDetailTitle" style="margin:0;"></h2>
+                            <span id="pqDetailStatusBadge" class="badge"></span>
+                        </div>
+                        <p id="pqDetailDescription" style="color:#666; margin:0 0 12px;"></p>
+                        <div style="display:flex; gap:24px; font-size:13px; color:#666;">
+                            <span>Points: <strong id="pqDetailPoints"></strong></span>
+                            <span>Questions: <strong id="pqDetailQCount"></strong></span>
+                            <span>Created: <strong id="pqDetailCreated"></strong></span>
+                        </div>
+                    </div>
+
+                    <h3 style="margin:0 0 12px;">Questions</h3>
+                    <div id="pqDetailQuestions"></div>
+                </div>
             </div>
 
             <!-- Survey Details Section -->

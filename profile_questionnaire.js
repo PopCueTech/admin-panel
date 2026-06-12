@@ -111,7 +111,8 @@ async function loadProfileQuestionnairesList() {
                 <td style="font-size:12px; color:#666;">
                     ${s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A'}
                 </td>
-                <td>
+                <td style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button class="btn-ghost" onclick="showProfileQuestionnaireDetail('${s.id}')">Review</button>
                     ${!s.is_active
                         ? `<button class="btn-ghost btn-ghost-brand" onclick="publishProfileQuestionnaire('${s.id}')">Publish</button>`
                         : `<button class="btn-ghost" onclick="unpublishProfileQuestionnaire('${s.id}')" style="color:#c62828;">Unpublish</button>`
@@ -370,6 +371,87 @@ async function submitProfileQuestionnaire() {
     }
 }
 
+// ─── Detail / Review view ────────────────────────────────────────────
+
+async function showProfileQuestionnaireDetail(surveyId) {
+    window._pqDetailId = surveyId;
+
+    document.getElementById('profileQuestionnaireListView').style.display = 'none';
+    document.getElementById('profileQuestionnaireFormView').style.display = 'none';
+    const detailView = document.getElementById('profileQuestionnaireDetailView');
+    detailView.style.display = 'block';
+
+    document.getElementById('pqDetailTitle').textContent = 'Loading…';
+    document.getElementById('pqDetailDescription').textContent = '';
+    document.getElementById('pqDetailQuestions').innerHTML = '';
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const s = await response.json();
+
+        document.getElementById('pqDetailTitle').textContent = s.title || 'Untitled';
+        document.getElementById('pqDetailDescription').textContent = s.description || 'No description';
+        document.getElementById('pqDetailPoints').textContent = s.points || 0;
+        document.getElementById('pqDetailCreated').textContent = s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A';
+
+        const badge = document.getElementById('pqDetailStatusBadge');
+        if (s.is_active) {
+            badge.textContent = 'Published';
+            badge.className = 'badge badge-success';
+        } else {
+            badge.textContent = 'Draft';
+            badge.className = 'badge badge-warning';
+        }
+
+        document.getElementById('pqDetailPublishBtn').style.display = s.is_active ? 'none' : 'inline-block';
+        document.getElementById('pqDetailUnpublishBtn').style.display = s.is_active ? 'inline-block' : 'none';
+
+        const questions = (s.current_version && s.current_version.structure && s.current_version.structure.questions) || [];
+        document.getElementById('pqDetailQCount').textContent = questions.length;
+
+        const container = document.getElementById('pqDetailQuestions');
+        if (questions.length === 0) {
+            container.innerHTML = '<p style="color:#999;">No questions found.</p>';
+        } else {
+            container.innerHTML = questions.map((q, idx) => {
+                const options = q.data && q.data.options ? q.data.options : (q.answers || q.options || []);
+                const optionsHTML = options.length > 0
+                    ? `<div style="margin-top:8px; padding-left:12px; border-left:2px solid #e5e7eb;">
+                        ${options.map(o => `<div style="font-size:0.9em; color:#555; padding:3px 0;">• ${escapePqHtml(o.label || o.text || String(o))}</div>`).join('')}
+                       </div>`
+                    : '';
+                const sliderHTML = (q.type === 'slider' && q.data)
+                    ? `<div style="font-size:0.85em; color:#666; margin-top:4px;">Range: ${q.data.min ?? 1} – ${q.data.max ?? 10}, step ${q.data.step ?? 1}</div>`
+                    : '';
+                return `
+                    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <strong>Q${idx + 1}: ${escapePqHtml(q.title || q.label || q.text || 'Untitled')}</strong>
+                            <div style="display:flex; gap:6px; flex-shrink:0;">
+                                <span style="font-size:0.8em; background:#f3f4f6; border-radius:4px; padding:2px 6px;">${escapePqHtml(q.type)}</span>
+                                ${q.required ? '<span style="font-size:0.8em; background:#fef3c7; border-radius:4px; padding:2px 6px;">required</span>' : ''}
+                            </div>
+                        </div>
+                        ${q.attribute_key ? `<div style="font-size:0.8em; color:#888; margin-bottom:4px;">attribute_key: <code>${escapePqHtml(q.attribute_key)}</code></div>` : ''}
+                        ${optionsHTML}
+                        ${sliderHTML}
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (e) {
+        document.getElementById('pqDetailTitle').textContent = 'Failed to load';
+        document.getElementById('pqDetailQuestions').innerHTML = `<p style="color:#c62828;">${escapePqHtml(e.message)}</p>`;
+        console.error('[profile_questionnaire] detail load failed:', e);
+    }
+}
+
+function closeProfileQuestionnaireDetail() {
+    document.getElementById('profileQuestionnaireDetailView').style.display = 'none';
+    document.getElementById('profileQuestionnaireListView').style.display = 'block';
+}
+
 // ─── Publish / Unpublish ─────────────────────────────────────────────
 
 async function publishProfileQuestionnaire(surveyId) {
@@ -384,7 +466,12 @@ async function publishProfileQuestionnaire(surveyId) {
         }
         const data = await response.json();
         showToast(`✅ ${data.message || 'Published'}`, 'success');
-        await loadProfileQuestionnairesList();
+        const inDetail = document.getElementById('profileQuestionnaireDetailView').style.display !== 'none';
+        if (inDetail) {
+            await showProfileQuestionnaireDetail(surveyId);
+        } else {
+            await loadProfileQuestionnairesList();
+        }
     } catch (e) {
         showToast(`Error: ${e.message}`, 'error');
         console.error('[profile_questionnaire] publish failed:', e);
@@ -403,7 +490,12 @@ async function unpublishProfileQuestionnaire(surveyId) {
             throw new Error(err.detail || `HTTP ${response.status}`);
         }
         showToast('Questionnaire moved to draft', 'success');
-        await loadProfileQuestionnairesList();
+        const inDetail = document.getElementById('profileQuestionnaireDetailView').style.display !== 'none';
+        if (inDetail) {
+            await showProfileQuestionnaireDetail(surveyId);
+        } else {
+            await loadProfileQuestionnairesList();
+        }
     } catch (e) {
         showToast(`Error: ${e.message}`, 'error');
         console.error('[profile_questionnaire] unpublish failed:', e);
