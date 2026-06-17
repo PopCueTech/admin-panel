@@ -25,6 +25,148 @@ let currentAnalyticsJobId = null;
 let analyticsPollInterval = null;
 
 // ═════════════════════════════════════════════════════════
+// ANALYTICS JOB PERSISTENCE (localStorage)
+// ═════════════════════════════════════════════════════════
+
+const ANALYTICS_JOB_PREFIX = 'popcue_analytics_job_';
+const ANALYTICS_JOB_STALE_HOURS = 2; // Clear stale jobs older than this
+
+function saveAnalyticsJob(surveyId, jobId) {
+    localStorage.setItem(`${ANALYTICS_JOB_PREFIX}${surveyId}`, JSON.stringify({
+        jobId, surveyId, startedAt: new Date().toISOString()
+    }));
+}
+
+function getAnalyticsJob(surveyId) {
+    const raw = localStorage.getItem(`${ANALYTICS_JOB_PREFIX}${surveyId}`);
+    if (!raw) return null;
+    try {
+        const job = JSON.parse(raw);
+        // Staleness check: if job is older than ANALYTICS_JOB_STALE_HOURS, discard it
+        if (job.startedAt) {
+            const ageHours = (Date.now() - new Date(job.startedAt).getTime()) / (1000 * 60 * 60);
+            if (ageHours > ANALYTICS_JOB_STALE_HOURS) {
+                console.log(`[Analytics] Clearing stale job for survey ${surveyId} (age: ${ageHours.toFixed(1)}h)`);
+                clearAnalyticsJob(surveyId);
+                return null;
+            }
+        }
+        return job;
+    } catch (e) {
+        clearAnalyticsJob(surveyId);
+        return null;
+    }
+}
+
+function clearAnalyticsJob(surveyId) {
+    localStorage.removeItem(`${ANALYTICS_JOB_PREFIX}${surveyId}`);
+}
+
+/**
+ * Check for existing analytics state when loading survey details.
+ * 1. If localStorage has a saved running job → resume polling
+ * 2. If no saved job → check GCS for an existing PDF report
+ * 3. Updates the analytics card UI accordingly
+ */
+async function checkExistingAnalyticsState(surveyId) {
+    const analyticsCard = document.getElementById('analyticsCard');
+    const analyticsContent = document.getElementById('analyticsContent');
+    const downloadPdfBtn = document.getElementById('downloadAnalyticsPdfBtn');
+    const refreshBtn = document.getElementById('analyticsRefreshBtn');
+    const pipelineSteps = document.getElementById('pipelineSteps');
+
+    // 1. Check localStorage for a saved job
+    const savedJob = getAnalyticsJob(surveyId);
+    if (savedJob) {
+        console.log(`[Analytics] Found saved job for survey ${surveyId}: ${savedJob.jobId}`);
+        currentAnalyticsJobId = savedJob.jobId;
+
+        // Try to get the job's current status from the engine
+        try {
+            const response = await fetch(
+                `${ANALYTICS_ENGINE_URL}/pipeline/status/${savedJob.jobId}`
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.status === 'running') {
+                    // Job is still running — resume polling
+                    analyticsCard.style.display = 'block';
+                    refreshBtn.style.display = 'inline-block';
+                    pipelineSteps.style.display = 'block';
+                    renderPipelineSteps(data.steps || []);
+                    updateAnalyticsContent(`⏳ Pipeline still running — Job: ${savedJob.jobId}`);
+                    startAnalyticsPolling();
+                    return;
+                } else if (['completed', 'failed', 'partial_failure'].includes(data.status)) {
+                    // Job finished — show final state and clear localStorage
+                    clearAnalyticsJob(surveyId);
+                    currentAnalyticsJobId = savedJob.jobId; // Keep for display
+
+                    const statusEmoji = { completed: '✅', failed: '❌', partial_failure: '⚠️' };
+                    const emoji = statusEmoji[data.status] || '🔄';
+                    const duration = data.duration_seconds ? ` (${Math.round(data.duration_seconds)}s)` : '';
+
+                    analyticsCard.style.display = 'block';
+                    refreshBtn.style.display = 'inline-block';
+                    updateAnalyticsContent(
+                        `${emoji} Status: <strong>${data.status}</strong>${duration} — Job: ${savedJob.jobId}`
+                    );
+
+                    if (data.steps && data.steps.length > 0) {
+                        pipelineSteps.style.display = 'block';
+                        renderPipelineSteps(data.steps);
+                    }
+                    if (data.output_files && Object.keys(data.output_files).length > 0) {
+                        renderAnalyticsResults(data);
+                    }
+                    if (data.output_files?.pdf_report) {
+                        downloadPdfBtn.style.display = 'inline-block';
+                    }
+                    return;
+                }
+            } else {
+                // Engine returned error (404 = job expired/not found) — clear stale job
+                console.warn(`[Analytics] Engine returned ${response.status} for job ${savedJob.jobId}, clearing`);
+                clearAnalyticsJob(surveyId);
+                currentAnalyticsJobId = null;
+            }
+        } catch (err) {
+            console.warn('[Analytics] Failed to poll saved job status:', err);
+            clearAnalyticsJob(surveyId);
+            currentAnalyticsJobId = null;
+        }
+    }
+
+    // 2. No running job — check if a completed PDF report exists in GCS
+    try {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/surveys/${surveyId}/analytics/download/pdf`
+        );
+
+        if (response.ok) {
+            // PDF report exists — show "Report available" state
+            analyticsCard.style.display = 'block';
+            downloadPdfBtn.style.display = 'inline-block';
+            updateAnalyticsContent(
+                '✅ <strong>Analytics report available.</strong> Click "📄 Download PDF" to view the report.'
+            );
+            console.log(`[Analytics] Existing PDF report found for survey ${surveyId}`);
+            return;
+        }
+    } catch (err) {
+        // GCS check failed — not critical, just show default state
+        console.warn('[Analytics] Failed to check for existing report:', err);
+    }
+
+    // 3. No job, no report — show default state
+    analyticsContent.innerHTML = '<p class="no-data">No analytics run yet. Click "🧪 Run Analytics" to start.</p>';
+    downloadPdfBtn.style.display = 'none';
+    pipelineSteps.style.display = 'none';
+}
+
+// ═════════════════════════════════════════════════════════
 // INITIALIZATION
 // ═════════════════════════════════════════════════════════
 
@@ -1199,6 +1341,9 @@ function updateActionButtons(survey) {
         analyticsCard.style.display = 'block';
         publishBtn.style.display = 'none';
         unpublishBtn.style.display = 'inline-block';
+
+        // Restore analytics state (check for running jobs or existing reports)
+        checkExistingAnalyticsState(survey.id);
     } else {
         downloadBtn.style.display = 'none';
         downloadMetricsBtn.style.display = 'none';
@@ -1432,12 +1577,251 @@ async function loadSurveyMetrics(surveyId) {
         const data = await response.json();
         displayMetrics(data);
         metricsCard.style.display = 'block';
+        initSegmentPicker(surveyId);
 
     } catch (error) {
         console.error('Metrics load error:', error);
         metricsCard.style.display = 'block';
         document.getElementById('kpiMetrics').innerHTML = `<p class="no-data">Failed to load metrics: ${error.message}</p>`;
     }
+}
+
+// ═════════════════════════════════════════════════════════
+// PROFILE ATTRIBUTE SEGMENTATION
+// ═════════════════════════════════════════════════════════
+
+async function initSegmentPicker(surveyId) {
+    const bar = document.getElementById('segmentPickerBar');
+    const select = document.getElementById('segmentKeySelect');
+    const indicator = document.getElementById('segmentLoadingIndicator');
+
+    // Reset picker state
+    select.innerHTML = '<option value="">— All Respondents —</option>';
+    bar.style.display = 'none';
+    indicator.style.display = 'inline';
+
+    try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/segments`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const segments = data.segments || {};
+        if (Object.keys(segments).length === 0) return;
+
+        for (const key of Object.keys(segments)) {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = formatMetricLabel(key);
+            select.appendChild(opt);
+        }
+
+        select._segmentsData = segments;
+        select._surveyId = surveyId;
+        select.onchange = () => {
+            const key = select.value;
+            if (!key) {
+                clearSegmentation();
+            } else {
+                const values = segments[key] || [];
+                onSegmentKeyChange(surveyId, key, values);
+            }
+        };
+        bar.style.display = 'flex';
+    } catch (e) {
+        console.warn('Segment picker init failed:', e);
+    } finally {
+        indicator.style.display = 'none';
+    }
+}
+
+async function onSegmentKeyChange(surveyId, segmentKey, segmentValues) {
+    document.getElementById('clearSegmentBtn').style.display = 'inline-block';
+    await loadSegmentComparison(surveyId, segmentKey, segmentValues);
+}
+
+async function loadSegmentComparison(surveyId, segmentKey, segmentValues) {
+    const compView = document.getElementById('segmentComparisonView');
+    const kpiGrid = document.getElementById('kpiMetrics');
+    const qaSection = document.getElementById('questionAnalyticsSection');
+
+    kpiGrid.style.display = 'none';
+    qaSection.style.display = 'none';
+    compView.style.display = 'block';
+    compView.innerHTML = '<p class="no-data" style="padding: 20px;">Loading segment comparison...</p>';
+
+    const fetches = segmentValues.map(val =>
+        fetchWithAuth(
+            `${API_BASE_URL}/api/v1/surveys/${surveyId}/metrics/segmented` +
+            `?segment_key=${encodeURIComponent(segmentKey)}&segment_value=${encodeURIComponent(val)}`
+        )
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+
+    const results = await Promise.allSettled(fetches);
+    const segmentData = results
+        .map((r, i) => (r.status === 'fulfilled' && r.value)
+            ? { value: segmentValues[i], data: r.value }
+            : null
+        )
+        .filter(Boolean);
+
+    if (segmentData.length === 0) {
+        compView.innerHTML = '<p class="no-data" style="padding: 20px;">No segment data available for the selected attribute.</p>';
+        return;
+    }
+
+    renderSegmentComparison(segmentKey, segmentData);
+}
+
+function renderSegmentComparison(segmentKey, segmentDataArray) {
+    const compView = document.getElementById('segmentComparisonView');
+    const segmentLabel = formatMetricLabel(segmentKey);
+
+    const kpiMetricLabels = {
+        purchase_intent_percent:   { label: 'Purchase Intent',   icon: '🛒', unit: '%' },
+        clarity_score:             { label: 'Clarity Score',     icon: '💡', unit: '/5' },
+        visual_appeal_score:       { label: 'Visual Appeal',     icon: '🎨', unit: '/5' },
+        perceived_quality_score:   { label: 'Perceived Quality', icon: '⭐', unit: '/5' },
+        shelf_impact_score:        { label: 'Shelf Impact',      icon: '📦', unit: '/5' },
+        repeat_intent_percent:     { label: 'Repeat Intent',     icon: '🔄', unit: '%' },
+        appeal_score:              { label: 'Appeal',            icon: '❤️', unit: '/5' },
+        decision_time_median_ms:   { label: 'Decision Time',     icon: '⏱️', unit: 'ms' },
+        hesitation_rate_percent:   { label: 'Hesitation Rate',   icon: '🤔', unit: '%' },
+        hard_rejection_percent:    { label: 'Hard Rejection',    icon: '🚫', unit: '%' },
+        believability_score:       { label: 'Believability',     icon: '✅', unit: '/5' },
+        readability_index:         { label: 'Readability',       icon: '📖', unit: '/5' },
+    };
+
+    // ── KPI comparison cards ─────────────────────────────────────────────
+    let html = `<div class="segment-comparison-section">
+        <div class="metrics-section-title">Segment by ${segmentLabel}</div>
+        <div class="concept-cards segment-kpi-cards">`;
+
+    for (const seg of segmentDataArray) {
+        const metrics = seg.data.metrics || {};
+        html += `<div class="concept-card segment-card">
+            <div class="concept-card-title">${seg.value}</div>
+            <div class="segment-card-n">n=${seg.data.respondent_count} (${seg.data.percent_of_total}%)</div>`;
+
+        let shownDecisionTime = false;
+        let hasAny = false;
+        for (const [mKey, info] of Object.entries(kpiMetricLabels)) {
+            const val = metrics[mKey];
+            if (val == null) continue;
+            if (mKey.startsWith('decision_time') && shownDecisionTime) continue;
+            if (mKey.startsWith('decision_time')) shownDecisionTime = true;
+            hasAny = true;
+            const display = typeof val === 'number' ? val.toFixed(1) : val;
+            html += `<div class="concept-metric-row">
+                <span class="concept-metric-row-icon">${info.icon}</span>
+                <span class="concept-metric-row-label">${info.label}</span>
+                <span class="concept-metric-row-value">${display}${info.unit}</span>
+            </div>`;
+        }
+        if (!hasAny) {
+            html += `<div style="font-size: 12px; color: var(--color-text-tertiary); margin-top: 8px;">No KPI data</div>`;
+        }
+        html += `</div>`;
+    }
+    html += `</div>`;
+
+    // ── Per-question analytics by segment ────────────────────────────────
+    const allQuestions = {};
+    for (const seg of segmentDataArray) {
+        for (const qa of (seg.data.question_analytics || [])) {
+            if (!allQuestions[qa.question_id]) {
+                allQuestions[qa.question_id] = { question_text: qa.question_text, question_type: qa.question_type };
+            }
+        }
+    }
+
+    if (Object.keys(allQuestions).length > 0) {
+        html += `<div class="metrics-section-title" style="margin-top: 24px;">Question Analytics by Segment</div>`;
+
+        for (const [qId, qMeta] of Object.entries(allQuestions)) {
+            html += `<div class="qa-card">
+                <div class="qa-header">
+                    <span class="qa-question-text">${qMeta.question_text || qId}</span>
+                    <span class="qa-type-badge">${qMeta.question_type || 'unknown'}</span>
+                </div>
+                <div class="segment-qa-columns">`;
+
+            for (const seg of segmentDataArray) {
+                const qa = (seg.data.question_analytics || []).find(q => q.question_id === qId);
+                const nCount = qa ? qa.total_responses : 0;
+                html += `<div class="segment-qa-col">
+                    <div class="segment-qa-col-header">${seg.value} <span class="qa-response-badge">n=${nCount}</span></div>
+                    ${qa ? renderQuestionAnalyticsBlock(qa) : '<div class="no-data" style="font-size: 12px; padding: 4px 0;">No data</div>'}
+                </div>`;
+            }
+
+            html += `</div></div>`;
+        }
+    }
+
+    html += `</div>`;
+    compView.innerHTML = html;
+}
+
+function clearSegmentation() {
+    const select = document.getElementById('segmentKeySelect');
+    if (select) select.value = '';
+    document.getElementById('clearSegmentBtn').style.display = 'none';
+    document.getElementById('segmentComparisonView').style.display = 'none';
+    document.getElementById('kpiMetrics').style.display = '';
+    document.getElementById('questionAnalyticsSection').style.display = '';
+}
+
+function renderQuestionAnalyticsBlock(qa) {
+    let html = '';
+    if (qa.question_type === 'multi_slider' && qa.analytics?.sliders) {
+        html += `<div>`;
+        for (const [sliderId, slider] of Object.entries(qa.analytics.sliders)) {
+            const label = slider.label || sliderId;
+            const meanVal = slider.mean || 0;
+            const barWidth = Math.min((meanVal / 100) * 100, 100);
+            html += `<div class="qa-slider-row">
+                <span class="qa-row-label">${label}</span>
+                <div class="qa-row-bar-bg"><div class="qa-row-bar" style="width: ${barWidth}%"></div></div>
+                <span class="qa-row-value">${meanVal.toFixed(1)}</span>
+            </div>`;
+        }
+        html += `</div>`;
+    } else if (qa.question_type === 'mcq' && qa.analytics?.options) {
+        html += `<div>`;
+        for (const [optId, opt] of Object.entries(qa.analytics.options)) {
+            const label = opt.label || optId;
+            const percent = opt.percent || 0;
+            const count = opt.count || 0;
+            html += `<div class="qa-option-row">
+                <span class="qa-row-label">${label}</span>
+                <div class="qa-row-bar-bg"><div class="qa-row-bar" style="width: ${percent}%"></div></div>
+                <span class="qa-row-value">${percent.toFixed(1)}% (n=${count})</span>
+            </div>`;
+        }
+        html += `</div>`;
+    } else if (qa.question_type === 'ranking' && qa.analytics?.items) {
+        const rankingItems = Object.entries(qa.analytics.items)
+            .map(([key, item]) => ({
+                id: parseRankingKey(key),
+                label: item.label || parseRankingKey(key),
+                avgRank: item.avg_rank || 0
+            }))
+            .sort((a, b) => a.avgRank - b.avgRank);
+
+        html += `<div class="qa-rank-list">`;
+        rankingItems.forEach((item, idx) => {
+            html += `<div class="qa-rank-item">
+                <span class="qa-rank-number">${idx + 1}</span>
+                <span class="qa-row-label">${item.label}</span>
+            </div>`;
+        });
+        html += `</div>`;
+    } else if (qa.question_type === 'text') {
+        const responseCount = qa.analytics?.response_count || 0;
+        html += `<div class="qa-text-note">📝 ${responseCount} open-ended response${responseCount !== 1 ? 's' : ''} (not displayed)</div>`;
+    }
+    return html;
 }
 
 function parseRankingKey(keyStr) {
@@ -1681,62 +2065,7 @@ function displayMetrics(data) {
                     <span class="qa-response-badge">n=${totalResponses}</span>
                 </div>`;
 
-            // Render based on question type
-            if (qa.question_type === 'multi_slider' && qa.analytics?.sliders) {
-                qaHTML += `<div>`;
-                for (const [sliderId, slider] of Object.entries(qa.analytics.sliders)) {
-                    const label = slider.label || sliderId;
-                    const mean = slider.mean || 0;
-                    const barWidth = Math.min((mean / 100) * 100, 100);
-                    qaHTML += `
-                        <div class="qa-slider-row">
-                            <span class="qa-row-label">${label}</span>
-                            <div class="qa-row-bar-bg">
-                                <div class="qa-row-bar" style="width: ${barWidth}%"></div>
-                            </div>
-                            <span class="qa-row-value">${mean.toFixed(1)}</span>
-                        </div>`;
-                }
-                qaHTML += `</div>`;
-            } else if (qa.question_type === 'mcq' && qa.analytics?.options) {
-                qaHTML += `<div>`;
-                for (const [optId, opt] of Object.entries(qa.analytics.options)) {
-                    const label = opt.label || optId;
-                    const percent = opt.percent || 0;
-                    const count = opt.count || 0;
-                    qaHTML += `
-                        <div class="qa-option-row">
-                            <span class="qa-row-label">${label}</span>
-                            <div class="qa-row-bar-bg">
-                                <div class="qa-row-bar" style="width: ${percent}%"></div>
-                            </div>
-                            <span class="qa-row-value">${percent.toFixed(1)}% (n=${count})</span>
-                        </div>`;
-                }
-                qaHTML += `</div>`;
-            } else if (qa.question_type === 'ranking' && qa.analytics?.items) {
-                const rankingItems = Object.entries(qa.analytics.items)
-                    .map(([key, item]) => ({
-                        id: parseRankingKey(key),
-                        label: item.label || parseRankingKey(key),
-                        avgRank: item.avg_rank || 0
-                    }))
-                    .sort((a, b) => a.avgRank - b.avgRank);
-
-                qaHTML += `<div class="qa-rank-list">`;
-                rankingItems.forEach((item, idx) => {
-                    qaHTML += `
-                        <div class="qa-rank-item">
-                            <span class="qa-rank-number">${idx + 1}</span>
-                            <span class="qa-row-label">${item.label}</span>
-                        </div>`;
-                });
-                qaHTML += `</div>`;
-            } else if (qa.question_type === 'text') {
-                const responseCount = qa.analytics?.response_count || 0;
-                qaHTML += `<div class="qa-text-note">📝 ${responseCount} open-ended response${responseCount !== 1 ? 's' : ''} (not displayed)</div>`;
-            }
-
+            qaHTML += renderQuestionAnalyticsBlock(qa);
             qaHTML += `</div>`;
         }
 
@@ -2249,6 +2578,45 @@ async function startAnalyticsPipeline() {
         return;
     }
 
+    const surveyId = currentSurveyData.id;
+
+    // ── Duplicate job guard ──────────────────────────────────────────────
+    const existingJob = getAnalyticsJob(surveyId);
+    if (existingJob) {
+        try {
+            const statusResp = await fetch(
+                `${ANALYTICS_ENGINE_URL}/pipeline/status/${existingJob.jobId}`
+            );
+            if (statusResp.ok) {
+                const statusData = await statusResp.json();
+                if (statusData.status === 'running') {
+                    // Job is still running — warn user and resume polling instead
+                    showToast('⚠️ A pipeline is already running for this survey. Resuming status tracking.', 'info');
+                    closeAnalyticsModal();
+                    currentAnalyticsJobId = existingJob.jobId;
+
+                    document.getElementById('analyticsCard').style.display = 'block';
+                    document.getElementById('analyticsRefreshBtn').style.display = 'inline-block';
+                    document.getElementById('pipelineSteps').style.display = 'block';
+                    renderPipelineSteps(statusData.steps || []);
+                    updateAnalyticsContent(`⏳ Pipeline already running — Job: ${existingJob.jobId}`);
+                    startAnalyticsPolling();
+                    return;
+                } else {
+                    // Job finished — clear it and allow re-run
+                    clearAnalyticsJob(surveyId);
+                }
+            } else {
+                // Engine doesn't know this job — clear stale entry
+                clearAnalyticsJob(surveyId);
+            }
+        } catch (err) {
+            console.warn('[Analytics] Failed to check existing job, proceeding with new run:', err);
+            clearAnalyticsJob(surveyId);
+        }
+    }
+    // ── End duplicate job guard ──────────────────────────────────────────
+
     // Validate weights
     const cs = parseFloat(document.getElementById('weightCs').value) || 0;
     const bq = parseFloat(document.getElementById('weightBq').value) || 0;
@@ -2266,8 +2634,6 @@ async function startAnalyticsPipeline() {
     const startBtn = document.getElementById('startPipelineBtn');
     startBtn.disabled = true;
     startBtn.textContent = '⏳ Starting...';
-
-    const surveyId = currentSurveyData.id;
 
     try {
         // Step 1: Upload survey summary to GCS
@@ -2294,6 +2660,9 @@ async function startAnalyticsPipeline() {
         // Step 2: Generate a client-side job_id so we can poll immediately
         const jobId = `pipeline_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
         currentAnalyticsJobId = jobId;
+
+        // Persist job to localStorage so it survives logout/reload
+        saveAnalyticsJob(surveyId, jobId);
 
         // Step 3: Trigger analytics pipeline (blocking POST — runs in background)
         const pipelineBody = {
@@ -2323,6 +2692,13 @@ async function startAnalyticsPipeline() {
             if (analyticsPollInterval) {
                 clearInterval(analyticsPollInterval);
                 analyticsPollInterval = null;
+            }
+
+            // Clear/update localStorage on terminal state
+            if (result.status === 'completed') {
+                clearAnalyticsJob(surveyId);
+            } else if (result.status === 'failed' || result.status === 'partial_failure') {
+                clearAnalyticsJob(surveyId);
             }
 
             if (result.status === 'failed') {
@@ -2357,6 +2733,7 @@ async function startAnalyticsPipeline() {
                 showToast(`❌ Pipeline error: ${err.message}`, 'error');
                 updateAnalyticsContent(`❌ Pipeline error: ${err.message}`);
                 console.error('Pipeline POST error:', err);
+                clearAnalyticsJob(surveyId);
             }
         });
 
@@ -2389,7 +2766,7 @@ async function startAnalyticsPipeline() {
 
 function updateAnalyticsContent(message) {
     document.getElementById('analyticsContent').innerHTML =
-        `<p style="font-size: 13px; color: #555; margin: 8px 0;">${message}</p>`;
+        `<p style="font-size: 14px; color: #1a1a1a; margin: 8px 0; font-weight: 500;">${message}</p>`;
 }
 
 function startAnalyticsPolling() {
@@ -2445,6 +2822,11 @@ async function refreshAnalyticsStatus() {
             if (analyticsPollInterval) {
                 clearInterval(analyticsPollInterval);
                 analyticsPollInterval = null;
+            }
+
+            // Clear localStorage for this survey's job
+            if (currentSurveyData) {
+                clearAnalyticsJob(currentSurveyData.id);
             }
 
             // Show results

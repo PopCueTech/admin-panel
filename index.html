@@ -870,6 +870,22 @@
                             </div>
                         </div>
 
+                        <!-- Segment Picker -->
+                        <div id="segmentPickerBar" style="display: none; margin-bottom: 16px;">
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <label style="font-size: 13px; font-weight: 500; color: var(--color-text-secondary);">Segment by</label>
+                                <select id="segmentKeySelect" class="segment-key-select">
+                                    <option value="">— All Respondents —</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary btn-sm" id="clearSegmentBtn"
+                                    onclick="clearSegmentation()" style="display: none;">Clear</button>
+                                <span id="segmentLoadingIndicator" style="display: none; font-size: 12px; color: var(--color-text-tertiary);">Loading segments...</span>
+                            </div>
+                        </div>
+
+                        <!-- Segmented Comparison View (replaces KPI grid when a segment is active) -->
+                        <div id="segmentComparisonView" style="display: none;"></div>
+
                         <!-- Concept Comparison, KPIs, Pick Rates -->
                         <div id="kpiMetrics" class="kpi-grid">
                             <p class="no-data">No metrics data yet</p>
@@ -888,7 +904,7 @@
                                 <button class="btn btn-secondary btn-sm" id="analyticsRefreshBtn"
                                     onclick="refreshAnalyticsStatus()" style="display: none;">Refresh</button>
                                 <button class="btn btn-primary btn-sm" id="downloadAnalyticsPdfBtn"
-                                    onclick="downloadAnalyticsPdf()" style="display: none;">📄 Download PDF</button>
+                                    onclick="downloadAnalyticsPdf()" style="display: none; background: linear-gradient(135deg, #dc2626, #b91c1c); color: white;">📄 Download PDF</button>
                             </div>
                         </div>
                         <div id="analyticsContent">
@@ -901,8 +917,8 @@
                             <h4 style="margin-bottom: 8px;">Pipeline Output</h4>
                             <div id="analyticsResultsContent"
                                 style="font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-                                       background: #f5f5f5; padding: 12px; border-radius: 6px; max-height: 400px;
-                                       overflow-y: auto; white-space: pre-wrap; word-break: break-word;">
+                                       background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 6px; max-height: 400px;
+                                       overflow-y: auto; white-space: pre-wrap; word-break: break-word; line-height: 1.6;">
                             </div>
                         </div>
                     </div>
