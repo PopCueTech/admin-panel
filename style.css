@@ -2131,3 +2131,67 @@ body {
     align-items: center;
     gap: 6px;
 }
+
+/* ─────────────────────────────────────────────
+   Drop-off / Abandonment analytics
+   ───────────────────────────────────────────── */
+.abandon-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+.abandon-header h3 { margin: 0; }
+.abandon-caveat {
+    margin: 4px 0 0;
+    font-size: 0.78em;
+    color: var(--color-text-tertiary, #9ca3af);
+    max-width: 680px;
+    line-height: 1.45;
+}
+.abandon-controls { display: flex; align-items: center; gap: 8px; }
+.abandon-controls label { font-size: 0.85em; color: var(--color-text-secondary, #6b7280); }
+.abandon-subtitle {
+    font-weight: 600;
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 22px 0 10px;
+}
+.abandon-hint {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    color: var(--color-text-tertiary, #9ca3af);
+}
+.abandon-table-wrap { overflow-x: auto; }
+.abandon-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+.abandon-table th, .abandon-table td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-primary, #e5e7eb);
+    white-space: nowrap;
+}
+.abandon-table th {
+    color: var(--color-text-secondary, #6b7280);
+    font-weight: 600;
+}
+.abandon-table td:first-child, .abandon-table th:first-child { white-space: normal; min-width: 160px; }
+.abandon-row { cursor: pointer; transition: background 0.12s ease; }
+.abandon-row:hover { background: var(--color-background-secondary, #f9fafb); }
+.abandon-row-active { background: rgba(83, 74, 183, 0.08); }
+.abandon-bad-text { color: var(--color-error, #E24B4A); font-weight: 600; }
+.abandon-empty { text-align: center; color: var(--color-text-tertiary, #9ca3af); padding: 18px; }
+.abandon-pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+.abandon-good { background: rgba(29, 158, 117, 0.12); color: var(--color-success, #1D9E75); }
+.abandon-warn { background: rgba(239, 159, 39, 0.16); color: var(--color-warning, #EF9F27); }
+.abandon-bad  { background: rgba(226, 75, 74, 0.12); color: var(--color-error, #E24B4A); }
+.abandon-chart-wrap { position: relative; width: 100%; height: 240px; }

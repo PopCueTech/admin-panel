@@ -277,6 +277,7 @@ async function loadDashboard() {
 
         const data = await response.json();
         displayDashboard(data);
+        loadAbandonment();
 
     } catch (error) {
         console.error('Dashboard error:', error);
@@ -329,6 +330,201 @@ function displayDashboard(data) {
         document.getElementById('cacheAge').textContent = `${data.cache_info.age_minutes.toFixed(1)} min ago`;
         document.getElementById('cacheExpires').textContent = `${data.cache_info.expires_in_minutes.toFixed(1)} min`;
     }
+}
+
+// ═════════════════════════════════════════════════════════
+// DROP-OFF / ABANDONMENT ANALYTICS
+// ═════════════════════════════════════════════════════════
+
+let abandonmentSelectedSurveyId = null;
+let abandonmentFunnelChart = null;
+
+function abandonEscape(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function abandonStaleHours() {
+    const el = document.getElementById('abandonmentStaleHours');
+    return el ? el.value : '24';
+}
+
+async function loadAbandonment() {
+    try {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/admin/abandonment/summary?stale_hours=${abandonStaleHours()}`
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        renderAbandonmentLeaderboard(data.surveys || []);
+        // Keep an open detail in sync with the stale-hours selection
+        if (abandonmentSelectedSurveyId) {
+            loadSurveyAbandonment(abandonmentSelectedSurveyId);
+        }
+    } catch (error) {
+        console.error('Abandonment error:', error);
+        const tbody = document.querySelector('#abandonmentLeaderboard tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="abandon-empty">Failed to load: ${abandonEscape(error.message)}</td></tr>`;
+        }
+    }
+}
+
+function renderAbandonmentLeaderboard(surveys) {
+    const tbody = document.querySelector('#abandonmentLeaderboard tbody');
+    if (!tbody) return;
+    if (!surveys.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="abandon-empty">No standard-survey sessions yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = surveys.map(s => {
+        const pct = s.completion_rate_pct ?? 0;
+        const rateClass = pct >= 70 ? 'abandon-good' : pct >= 40 ? 'abandon-warn' : 'abandon-bad';
+        return `<tr class="abandon-row" data-survey-id="${s.survey_id}" onclick="loadSurveyAbandonment('${s.survey_id}')">
+            <td>${abandonEscape(s.title)}</td>
+            <td>${s.started}</td>
+            <td>${s.completed}</td>
+            <td class="abandon-bad-text">${s.abandoned}</td>
+            <td>${s.active}</td>
+            <td><span class="abandon-pill ${rateClass}">${pct.toFixed(1)}%</span></td>
+        </tr>`;
+    }).join('');
+    updateAbandonHighlight();
+}
+
+function updateAbandonHighlight() {
+    document.querySelectorAll('#abandonmentLeaderboard tbody tr[data-survey-id]').forEach(tr => {
+        tr.classList.toggle('abandon-row-active', tr.dataset.surveyId === abandonmentSelectedSurveyId);
+    });
+}
+
+async function loadSurveyAbandonment(surveyId) {
+    abandonmentSelectedSurveyId = surveyId;
+    updateAbandonHighlight();
+    try {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/v1/admin/surveys/${surveyId}/abandonment?stale_hours=${abandonStaleHours()}`
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        renderSurveyAbandonment(data);
+    } catch (error) {
+        console.error('Survey abandonment error:', error);
+        showToast(`Failed to load drop-off detail: ${error.message}`, 'error');
+    }
+}
+
+function renderSurveyAbandonment(d) {
+    const detail = document.getElementById('abandonmentDetail');
+    if (detail) detail.style.display = 'block';
+
+    const titleEl = document.getElementById('abandonmentDetailTitle');
+    if (titleEl) titleEl.textContent = `Drop-off — ${d.title || 'survey'}`;
+
+    const kpis = document.getElementById('abandonmentKpis');
+    if (kpis) {
+        kpis.innerHTML =
+            abandonKpi(d.started, 'Started') +
+            abandonKpi(d.completed, 'Completed') +
+            abandonKpi(d.abandoned, 'Abandoned') +
+            abandonKpi(d.active, 'Active') +
+            abandonKpi(`${(d.completion_rate_pct ?? 0).toFixed(1)}%`, 'Completion');
+    }
+
+    renderAbandonmentFunnel(d.funnel || []);
+    renderAbandonmentFriction(d.friction || []);
+}
+
+function abandonKpi(value, label) {
+    return `<div class="kpi-card"><div class="kpi-value">${value}</div><div class="kpi-label">${label}</div></div>`;
+}
+
+function abandonBarColor(rate) {
+    // 0% abandon -> brand purple (#534AB7); >=50% -> error red (#E24B4A)
+    const t = Math.max(0, Math.min(1, (rate || 0) / 50));
+    const brand = [83, 74, 183];
+    const error = [226, 75, 74];
+    const mix = brand.map((b, i) => Math.round(b + (error[i] - b) * t));
+    return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+}
+
+function renderAbandonmentFunnel(funnel) {
+    const canvas = document.getElementById('abandonmentFunnelChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    if (abandonmentFunnelChart) {
+        abandonmentFunnelChart.destroy();
+        abandonmentFunnelChart = null;
+    }
+    if (!funnel.length) return;
+
+    // Size the chart area to the question count for readability
+    if (canvas.parentElement) {
+        canvas.parentElement.style.height = `${Math.max(160, funnel.length * 34 + 40)}px`;
+    }
+
+    abandonmentFunnelChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: funnel.map(f => `Q${f.ordinal + 1}`),
+            datasets: [{
+                label: 'Reached',
+                data: funnel.map(f => f.reached),
+                backgroundColor: funnel.map(f => abandonBarColor(f.abandon_rate_pct)),
+                borderWidth: 0,
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const f = funnel[items[0].dataIndex];
+                            return `Q${f.ordinal + 1}. ${f.title || ''}`;
+                        },
+                        label: (item) => {
+                            const f = funnel[item.dataIndex];
+                            return [
+                                `Reached: ${f.reached}`,
+                                `Abandoned here: ${f.abandoned_here} (${(f.abandon_rate_pct ?? 0).toFixed(1)}%)`,
+                            ];
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                y: { grid: { display: false } },
+            },
+        },
+    });
+}
+
+function renderAbandonmentFriction(friction) {
+    const tbody = document.querySelector('#abandonmentFriction tbody');
+    if (!tbody) return;
+    if (!friction.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="abandon-empty">No published version / no responses.</td></tr>';
+        return;
+    }
+    const ms = (v) => (v == null ? '—' : `${Math.round(v).toLocaleString()} ms`);
+    const num = (v) => (v == null ? '—' : Number(v).toFixed(2));
+    tbody.innerHTML = friction.map(r => `
+        <tr>
+            <td>Q${r.ordinal + 1}</td>
+            <td>${abandonEscape(r.title)}</td>
+            <td>${abandonEscape(r.type)}</td>
+            <td>${r.answer_count}</td>
+            <td>${ms(r.median_time_spent_ms)}</td>
+            <td>${num(r.avg_option_change_count)}</td>
+            <td>${ms(r.median_decision_latency_ms)}</td>
+        </tr>`).join('');
 }
 
 async function refreshDashboard() {

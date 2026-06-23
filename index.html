@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="auth.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Auth Screen -->
@@ -203,6 +204,73 @@
 
                 <div class="cache-info" id="cacheInfo">
                     <small>Cached: <span id="cacheAge">-</span> | Expires in: <span id="cacheExpires">-</span></small>
+                </div>
+
+                <!-- Drop-off / Abandonment Analytics -->
+                <div class="details-card" id="abandonmentCard" style="margin-top: 20px;">
+                    <div class="abandon-header">
+                        <div>
+                            <h3>Survey Drop-off Analytics</h3>
+                            <p class="abandon-caveat">Where users quit before completing. Abandonment is inferred from inactivity (see "Stale after"); the drop-off question is the one after the last answered (≈ +1). Standard surveys only.</p>
+                        </div>
+                        <div class="abandon-controls">
+                            <label for="abandonmentStaleHours">Stale after</label>
+                            <select id="abandonmentStaleHours" onchange="loadAbandonment()">
+                                <option value="6">6 hours</option>
+                                <option value="12">12 hours</option>
+                                <option value="24" selected>24 hours</option>
+                                <option value="72">3 days</option>
+                                <option value="168">7 days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="abandon-subtitle">Completion Leaderboard</div>
+                    <div class="abandon-table-wrap">
+                        <table class="abandon-table" id="abandonmentLeaderboard">
+                            <thead>
+                                <tr>
+                                    <th>Survey</th>
+                                    <th>Started</th>
+                                    <th>Completed</th>
+                                    <th>Abandoned</th>
+                                    <th>Active</th>
+                                    <th>Completion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" class="abandon-empty">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="abandonmentDetail" style="display: none;">
+                        <div class="abandon-subtitle" id="abandonmentDetailTitle">Per-survey Drop-off</div>
+                        <div class="kpi-grid" id="abandonmentKpis"></div>
+
+                        <div class="abandon-subtitle">Drop-off Funnel <span class="abandon-hint">(bar length = users who reached the question; red = higher abandon rate there)</span></div>
+                        <div class="abandon-chart-wrap">
+                            <canvas id="abandonmentFunnelChart"></canvas>
+                        </div>
+
+                        <div class="abandon-subtitle">Per-question Friction</div>
+                        <div class="abandon-table-wrap">
+                            <table class="abandon-table" id="abandonmentFriction">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Question</th>
+                                        <th>Type</th>
+                                        <th>Answers</th>
+                                        <th>Median time</th>
+                                        <th>Avg changes</th>
+                                        <th>Median latency</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
