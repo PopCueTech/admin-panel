@@ -562,6 +562,8 @@ function hideAllSections() {
     document.getElementById('backfillMetricsSection').style.display = 'none';
     document.getElementById('emailBroadcastSection').style.display = 'none';
     document.getElementById('panelsSection').style.display = 'none';
+    const rd = document.getElementById('redemptionsSection');
+    if (rd) rd.style.display = 'none';
     const pq = document.getElementById('profileQuestionnairesSection');
     if (pq) pq.style.display = 'none';
     const vs = document.getElementById('validatorSection');
@@ -584,6 +586,7 @@ function setActiveTab(section) {
         'backfill-demographics': 'Backfill demographics',
         'backfill-metrics': 'Backfill metrics',
         validator: 'Survey validator',
+        redemptions: 'Redemptions',
     };
 
     const titleEl = document.getElementById('pageTitle');
