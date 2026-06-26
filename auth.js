@@ -87,6 +87,7 @@ function showMainPanel() {
         'backfill-metrics': showBackfillMetrics,
         validator: showValidatorPage,
         redemptions: showRedemptions,
+        'user-quality': showUserQuality,
     };
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         item.addEventListener('click', () => sectionMap[item.dataset.section]?.());

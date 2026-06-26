@@ -97,6 +97,13 @@
                     </div>
                 </div>
                 <div class="nav-group">
+                    <div class="nav-group-label">Quality</div>
+                    <div class="nav-item" data-section="user-quality">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v3.2c0 3-2.1 5.3-5 6.3-2.9-1-5-3.3-5-6.3V3.5l5-2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 8l1.4 1.4L10.5 6.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        User quality
+                    </div>
+                </div>
+                <div class="nav-group">
                     <div class="nav-group-label">Utilities</div>
                     <div class="nav-item" data-section="backfill-demographics">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 0111.3-2.8M14 8a6 6 0 01-11.3 2.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M13 2v3h-3M3 14v-3h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1013,6 +1020,29 @@
                         </div>
                     </div>
 
+                    <!-- Data Quality Card -->
+                    <div id="dataQualityCard" class="details-card" style="display: none;">
+                        <div class="card-header">
+                            <h3>🛡️ Data quality</h3>
+                            <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#374151; cursor:pointer;">
+                                <input type="checkbox" id="dqExcludeToggle" onchange="onExcludeToggle()"> Exclude low-quality from KPIs
+                            </label>
+                        </div>
+                        <div id="dqExcludeNote" style="display:none; font-size:12px; color:#6b7280; margin:4px 0 12px;"></div>
+                        <div id="dqSummary"></div>
+                        <div style="margin-top:14px;">
+                            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                                <thead><tr style="color:#9ca3af; font-size:11px; text-align:left;">
+                                    <th style="padding:8px;">Respondent</th>
+                                    <th style="text-align:center;">Score</th>
+                                    <th>Flags</th>
+                                    <th style="text-align:right; padding-right:8px;">Status</th>
+                                </tr></thead>
+                                <tbody id="dqRespondentsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- Analytics Pipeline Card -->
                     <div id="analyticsCard" class="details-card" style="display: none;">
                         <div class="card-header">
@@ -1096,6 +1126,42 @@
                     </div>
                 </div>
             </div>
+            </div>
+            <div id="userQualitySection" style="display: none; padding: 20px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+                    <input type="search" id="uqSearch" placeholder="Search user, email…" style="flex:1; min-width:200px; max-width:320px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:13px;">
+                    <select id="uqTierFilter" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:13px;">
+                        <option value="">All tiers</option>
+                        <option value="flagged">Flagged</option>
+                        <option value="watch">Watch</option>
+                        <option value="trusted">Trusted</option>
+                    </select>
+                    <select id="uqSort" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:13px;">
+                        <option value="exclude_rate">Sort: exclude rate</option>
+                        <option value="mean_score">Sort: mean score</option>
+                        <option value="surveys">Sort: surveys taken</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="loadUserQuality()">🔄 Refresh</button>
+                </div>
+                <div id="uqMacro"></div>
+                <div style="background:#fff; border:0.5px solid #e5e7eb; border-radius:12px; padding:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead><tr style="color:#9ca3af; font-size:11px; text-align:left;">
+                            <th style="padding:8px;">User</th>
+                            <th style="text-align:center;">Surveys</th>
+                            <th style="text-align:center;">Exclude rate</th>
+                            <th style="text-align:center;">Mean</th>
+                            <th style="text-align:center;">Excluded</th>
+                            <th style="text-align:right; padding-right:8px;">Tier</th>
+                        </tr></thead>
+                        <tbody id="uqUsersBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="uqModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;" onclick="if(event.target===this)closeUserQualityDetail()">
+                <div style="background:#fff; border-radius:12px; max-width:640px; width:92%; max-height:85vh; overflow:auto; padding:20px;">
+                    <div id="uqModalBody"></div>
+                </div>
             </div>
             <!-- Close mainPanel / content-body -->
         </main>
@@ -1368,6 +1434,8 @@ async function uploadConceptImage(id) {
     <script src="panels.js"></script>
     <script src="profile_questionnaire.js"></script>
     <script src="redemptions.js"></script>
+    <script src="user_quality.js"></script>
+    <script src="survey_quality.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

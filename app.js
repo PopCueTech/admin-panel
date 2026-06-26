@@ -568,6 +568,8 @@ function hideAllSections() {
     if (pq) pq.style.display = 'none';
     const vs = document.getElementById('validatorSection');
     if (vs) vs.style.display = 'none';
+    const uq = document.getElementById('userQualitySection');
+    if (uq) uq.style.display = 'none';
 }
 
 function setActiveTab(section) {
@@ -587,6 +589,7 @@ function setActiveTab(section) {
         'backfill-metrics': 'Backfill metrics',
         validator: 'Survey validator',
         redemptions: 'Redemptions',
+        'user-quality': 'User quality',
     };
 
     const titleEl = document.getElementById('pageTitle');
@@ -1748,11 +1751,14 @@ async function unpublishSurveyFromDetail() {
 // SURVEY METRICS
 // ═════════════════════════════════════════════════════════
 
-async function loadSurveyMetrics(surveyId) {
+async function loadSurveyMetrics(surveyId, excludeLowQuality = false) {
+    window._dqSurveyId = surveyId;
     const metricsCard = document.getElementById('metricsCard');
 
     try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/${surveyId}/metrics`);
+        const url = `${API_BASE_URL}/api/v1/surveys/${surveyId}/metrics`
+            + (excludeLowQuality ? '?exclude_low_quality=true' : '');
+        const response = await fetchWithAuth(url);
 
         if (!response.ok) {
             // If 404 or no data, show card with "no data" message
@@ -1777,6 +1783,19 @@ async function loadSurveyMetrics(surveyId) {
         displayMetrics(data);
         metricsCard.style.display = 'block';
         initSegmentPicker(surveyId);
+
+        const dqNote = document.getElementById('dqExcludeNote');
+        if (dqNote) {
+            if (excludeLowQuality && data.quality) {
+                dqNote.style.display = 'block';
+                dqNote.textContent = `Showing clean sample: ${data.quality.clean_n} of ${data.quality.raw_n} respondents (${data.quality.excluded_n} excluded).`;
+            } else {
+                dqNote.style.display = 'none';
+            }
+        }
+        if (!excludeLowQuality && typeof loadSurveyQuality === 'function') {
+            loadSurveyQuality(surveyId);
+        }
 
     } catch (error) {
         console.error('Metrics load error:', error);
