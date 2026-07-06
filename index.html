@@ -375,6 +375,17 @@
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="aiProvider">AI Provider <span style="color: var(--color-text-tertiary); font-weight: 400;">(optional)</span></label>
+                    <select id="aiProvider">
+                        <option value="">Default (Fallback: OpenAI → Gemini → Claude)</option>
+                        <option value="openai">OpenAI (gpt-4o)</option>
+                        <option value="gemini">Gemini 2.0 Flash</option>
+                        <option value="claude">Claude 3.5 Sonnet</option>
+                    </select>
+                    <small style="color: var(--color-text-secondary); display: block; margin-top: 4px;">Choose a specific AI model or use the automatic fallback chain</small>
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-large" id="generateBtn">Generate Survey</button>
             </form>
 
