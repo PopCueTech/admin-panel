@@ -83,6 +83,7 @@ function showMainPanel() {
         email: showEmailBroadcast,
         panels: showPanels,
         'profile-questionnaires': showProfileQuestionnaires,
+        'profile-attributes': showProfileAttributes,
         'backfill-demographics': showBackfillDemographics,
         'backfill-metrics': showBackfillMetrics,
         validator: showValidatorPage,
