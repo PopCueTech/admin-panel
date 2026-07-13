@@ -76,6 +76,18 @@ async function _paLoadAttributes() {
     }
 }
 
+function _paRenderValueToggles(valuesContainer, values) {
+    valuesContainer.innerHTML = values.map((v, i) => `
+        <label class="pa-value-toggle">
+            <span class="pa-value-toggle-label">${escapePaHtml(v.value)} <span style="color:#9ca3af;">(${v.count})</span></span>
+            <span class="pa-switch">
+                <input type="checkbox" class="pa-condition-value-checkbox" value="${escapePaHtml(v.value)}">
+                <span class="pa-switch-slider"></span>
+            </span>
+        </label>
+    `).join('');
+}
+
 async function addAttributeCondition() {
     const container = document.getElementById('attributeConditions');
     if (!container) return;
@@ -85,24 +97,24 @@ async function addAttributeCondition() {
 
     const row = document.createElement('div');
     row.id = conditionId;
-    row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; padding:10px; border:1px solid var(--color-border-primary,#e5e7eb); border-radius:6px;';
+    row.className = 'pa-condition-row';
     row.innerHTML = `
-        <select class="pa-condition-key" style="flex:1; min-width:160px;">
-            <option value="">Select attribute…</option>
-            ${attributes.map(a => `<option value="${escapePaHtml(a.key)}">${escapePaHtml(a.key)}</option>`).join('')}
-        </select>
-        <select class="pa-condition-values" multiple style="flex:2; min-width:200px; min-height:70px;"></select>
-        <button type="button" class="btn btn-ghost btn-sm" style="color:#c62828;" onclick="document.getElementById('${conditionId}').remove()">✕</button>
+        <div class="pa-condition-row-header">
+            <select class="pa-condition-key">
+                <option value="">Select attribute…</option>
+                ${attributes.map(a => `<option value="${escapePaHtml(a.key)}">${escapePaHtml(a.key)}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" style="color:#c62828;" onclick="document.getElementById('${conditionId}').remove()">✕</button>
+        </div>
+        <div class="pa-value-toggles"></div>
     `;
     container.appendChild(row);
 
     const keySelect = row.querySelector('.pa-condition-key');
-    const valuesSelect = row.querySelector('.pa-condition-values');
+    const valuesContainer = row.querySelector('.pa-value-toggles');
     keySelect.addEventListener('change', () => {
         const attr = attributes.find(a => a.key === keySelect.value);
-        valuesSelect.innerHTML = (attr ? attr.values : [])
-            .map(v => `<option value="${escapePaHtml(v.value)}">${escapePaHtml(v.value)} (${v.count})</option>`)
-            .join('');
+        _paRenderValueToggles(valuesContainer, attr ? attr.values : []);
     });
 }
 
@@ -117,9 +129,9 @@ function getTargetAttributesFromForm() {
     if (!container) return null;
 
     const conditions = [];
-    container.querySelectorAll(':scope > div').forEach(row => {
+    container.querySelectorAll(':scope > .pa-condition-row').forEach(row => {
         const key = row.querySelector('.pa-condition-key')?.value;
-        const values = Array.from(row.querySelector('.pa-condition-values')?.selectedOptions || []).map(o => o.value);
+        const values = Array.from(row.querySelectorAll('.pa-condition-value-checkbox:checked')).map(cb => cb.value);
         if (key && values.length > 0) {
             conditions.push({ key, values });
         }
