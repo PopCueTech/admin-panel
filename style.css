@@ -2247,9 +2247,11 @@ body {
     position: absolute;
     cursor: pointer;
     top: 0; left: 0; right: 0; bottom: 0;
-    background-color: var(--color-background-tertiary, #e5e7eb);
+    background-color: var(--color-border-secondary, #d1d5db);
+    border: 1px solid var(--color-border-primary, #e5e7eb);
     border-radius: 20px;
     transition: 0.15s;
+    box-sizing: border-box;
 }
 .pa-switch-slider::before {
     position: absolute;
