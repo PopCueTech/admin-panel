@@ -117,6 +117,10 @@ async function loadProfileQuestionnairesList() {
                         ? `<button class="btn-ghost btn-ghost-brand" onclick="publishProfileQuestionnaire('${s.id}')">Publish</button>`
                         : `<button class="btn-ghost" onclick="unpublishProfileQuestionnaire('${s.id}')" style="color:#c62828;">Unpublish</button>`
                     }
+                    ${s.is_active
+                        ? `<button class="btn-ghost" onclick="alertRemainingProfileUsers('${s.id}')">🔔 Alert remaining</button>`
+                        : ''
+                    }
                 </td>
             </tr>
         `).join('');
@@ -406,6 +410,7 @@ async function showProfileQuestionnaireDetail(surveyId) {
 
         document.getElementById('pqDetailPublishBtn').style.display = s.is_active ? 'none' : 'inline-block';
         document.getElementById('pqDetailUnpublishBtn').style.display = s.is_active ? 'inline-block' : 'none';
+        document.getElementById('pqDetailNotifyRemainingBtn').style.display = s.is_active ? 'inline-block' : 'none';
 
         const questions = (s.current_version && s.current_version.structure && s.current_version.structure.questions) || [];
         document.getElementById('pqDetailQCount').textContent = questions.length;
@@ -499,6 +504,25 @@ async function unpublishProfileQuestionnaire(surveyId) {
     } catch (e) {
         showToast(`Error: ${e.message}`, 'error');
         console.error('[profile_questionnaire] unpublish failed:', e);
+    }
+}
+
+async function alertRemainingProfileUsers(surveyId) {
+    if (!confirm('Alert all users who haven\'t completed this profile questionnaire yet?')) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/profile-surveys/${surveyId}/notify-remaining`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+        console.error('[profile_questionnaire] alert remaining failed:', e);
     }
 }
 

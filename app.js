@@ -697,6 +697,9 @@ function renderSurveysTable(surveys) {
             <td style="display: flex; gap: 4px;">
                 <button class="btn-ghost" onclick="viewSurvey('${survey.id}')">View</button>
                 ${!survey.is_active ? `<button class="btn-ghost btn-ghost-brand" onclick="publishSurveyDirect('${survey.id}')">Publish</button>` : ''}
+                ${survey.is_active && (survey.completed_count || 0) < (survey.max_responses || 100)
+                    ? `<button class="btn-ghost" onclick="notifyRemainingParticipants('${survey.id}')">🔔 Notify remaining</button>`
+                    : ''}
             </td>
         </tr>
     `).join('');
@@ -807,6 +810,28 @@ async function publishSurveyDirect(surveyId) {
     } catch (error) {
         showToast(`Error: ${error.message}`, 'error');
         console.error('Publish error:', error);
+    }
+}
+
+async function notifyRemainingParticipants(surveyId) {
+    if (!confirm('Notify all remaining eligible participants who haven\'t taken this survey yet?')) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/admin/surveys/${surveyId}/notify-remaining`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to notify remaining participants');
+        }
+
+        const data = await response.json();
+        showToast(`✅ ${data.message}`, 'success');
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'error');
+        console.error('Notify remaining error:', error);
     }
 }
 
@@ -1539,6 +1564,7 @@ function updateActionButtons(survey) {
     const downloadMetricsBtn = document.getElementById('downloadMetricsBtn');
     const publishBtn = document.getElementById('publishDetailBtn');
     const unpublishBtn = document.getElementById('unpublishDetailBtn');
+    const notifyRemainingBtn = document.getElementById('notifyRemainingBtn');
 
     const runAnalyticsBtn = document.getElementById('runAnalyticsBtn');
     const analyticsCard = document.getElementById('analyticsCard');
@@ -1551,6 +1577,7 @@ function updateActionButtons(survey) {
         analyticsCard.style.display = 'block';
         publishBtn.style.display = 'none';
         unpublishBtn.style.display = 'inline-block';
+        notifyRemainingBtn.style.display = 'inline-block';
 
         // Restore analytics state (check for running jobs or existing reports)
         checkExistingAnalyticsState(survey.id);
@@ -1561,6 +1588,7 @@ function updateActionButtons(survey) {
         analyticsCard.style.display = 'none';
         publishBtn.style.display = 'inline-block';
         unpublishBtn.style.display = 'none';
+        notifyRemainingBtn.style.display = 'none';
     }
 }
 
@@ -1722,6 +1750,11 @@ async function publishSurveyFromDetail() {
 
     // Refresh the view with updated data
     await viewSurvey(currentSurveyData.id);
+}
+
+async function notifyRemainingFromDetail() {
+    if (!currentSurveyData) return;
+    await notifyRemainingParticipants(currentSurveyData.id);
 }
 
 async function unpublishSurveyFromDetail() {

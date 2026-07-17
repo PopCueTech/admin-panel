@@ -911,6 +911,7 @@
                         <div style="display:flex; gap:8px;">
                             <button type="button" id="pqDetailPublishBtn" class="btn btn-primary btn-sm" onclick="publishProfileQuestionnaire(window._pqDetailId)">Publish</button>
                             <button type="button" id="pqDetailUnpublishBtn" class="btn btn-secondary btn-sm" style="color:#c62828;" onclick="unpublishProfileQuestionnaire(window._pqDetailId)">Unpublish</button>
+                            <button type="button" id="pqDetailNotifyRemainingBtn" class="btn btn-secondary btn-sm" onclick="alertRemainingProfileUsers(window._pqDetailId)">🔔 Alert remaining</button>
                         </div>
                     </div>
 
@@ -1138,6 +1139,14 @@
                                 onclick="unpublishSurveyFromDetail()"
                                 style="display: none;">
                                 🔇 Unpublish Survey
+                            </button>
+                            <button
+                                id="notifyRemainingBtn"
+                                type="button"
+                                class="btn btn-secondary"
+                                onclick="notifyRemainingFromDetail()"
+                                style="display: none;">
+                                🔔 Notify Remaining Participants
                             </button>
                         </div>
                     </div>
