@@ -328,6 +328,12 @@ function displayDashboard(data) {
     document.getElementById('newReferrals').textContent = data.referrals.new_signups.toLocaleString();
     document.getElementById('referralConversion').textContent = `${data.referrals.conversion_rate.toFixed(1)}%`;
 
+    // Withdrawal progress metrics
+    document.getElementById('eligibleForWithdrawal').textContent = data.withdrawal_progress.eligible_now.toLocaleString();
+    document.getElementById('closeToWithdrawal').textContent = data.withdrawal_progress.close.toLocaleString();
+    document.getElementById('halfwayToWithdrawal').textContent = data.withdrawal_progress.halfway.toLocaleString();
+    document.getElementById('withdrawalTotalUsers').textContent = data.users.total.toLocaleString();
+
     // Cache info
     if (data.cache_info) {
         document.getElementById('cacheAge').textContent = `${data.cache_info.age_minutes.toFixed(1)} min ago`;
