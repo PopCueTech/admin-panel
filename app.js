@@ -250,6 +250,327 @@ function showSurveysList() {
 }
 
 // ═════════════════════════════════════════════════════════
+// GLP-1 SURVEY CREATION
+// ═════════════════════════════════════════════════════════
+
+let glp1UploadedJson = null;
+
+// Valid question types for the platform
+const GLP1_VALID_QUESTION_TYPES = [
+    'rating', 'mcq', 'image_selection', 'ranking', 'text', 'slider',
+    'multi_slider', 'image_grid_slider',
+    'rating_v2', 'consent', 'information_screen', 'height_weight',
+];
+
+function openGLP1SurveyModal() {
+    const modal = document.getElementById('glp1SurveyModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        clearGLP1File();
+    }
+}
+
+function closeGLP1SurveyModal() {
+    const modal = document.getElementById('glp1SurveyModal');
+    if (modal) {
+        modal.style.display = 'none';
+        clearGLP1File();
+    }
+}
+
+/**
+ * Validate the uploaded GLP-1 survey JSON structure.
+ * Returns { valid: boolean, errors: string[], warnings: string[] }
+ */
+function validateGLP1Json(json) {
+    const errors = [];
+    const warnings = [];
+
+    // 1. Top-level required fields
+    if (!json.title || typeof json.title !== 'string' || json.title.trim().length === 0) {
+        errors.push('Missing or empty "title" field.');
+    }
+    if (!Array.isArray(json.questions)) {
+        errors.push('Missing "questions" array.');
+        return { valid: false, errors, warnings };
+    }
+    if (json.questions.length === 0) {
+        errors.push('"questions" array is empty.');
+        return { valid: false, errors, warnings };
+    }
+
+    // 2. Validate each question
+    const seenIds = new Set();
+    json.questions.forEach((q, idx) => {
+        const loc = `Question ${idx + 1} (id: ${q.id || 'missing'})`;
+
+        // Required fields
+        if (!q.id) {
+            errors.push(`${loc}: Missing "id" field.`);
+        } else if (seenIds.has(q.id)) {
+            errors.push(`${loc}: Duplicate question id "${q.id}".`);
+        } else {
+            seenIds.add(q.id);
+        }
+
+        if (!q.type) {
+            errors.push(`${loc}: Missing "type" field.`);
+        } else if (!GLP1_VALID_QUESTION_TYPES.includes(q.type)) {
+            errors.push(`${loc}: Invalid question type "${q.type}". Valid types: ${GLP1_VALID_QUESTION_TYPES.join(', ')}`);
+        }
+
+        if (!q.title && q.type !== 'information_screen') {
+            warnings.push(`${loc}: Missing "title" — question text will be empty.`);
+        }
+
+        // Type-specific data validation
+        const data = q.data || {};
+        switch (q.type) {
+            case 'rating':
+            case 'rating_v2':
+                if (data.scale === undefined) {
+                    warnings.push(`${loc}: Rating missing "scale" in data. Defaulting to 5.`);
+                }
+                break;
+            case 'mcq':
+                if (!Array.isArray(data.options) || data.options.length === 0) {
+                    errors.push(`${loc}: MCQ has no "options" array in data.`);
+                } else {
+                    data.options.forEach((opt, oi) => {
+                        if (!opt.label && !opt.text) {
+                            warnings.push(`${loc}: Option ${oi + 1} has no "label" or "text".`);
+                        }
+                    });
+                }
+                break;
+            case 'slider':
+                if (!data.leftLabel && !data.rightLabel && !data.emojis) {
+                    warnings.push(`${loc}: Slider missing label fields (leftLabel/rightLabel).`);
+                }
+                break;
+            case 'multi_slider':
+                if (!Array.isArray(data.sliders) || data.sliders.length === 0) {
+                    errors.push(`${loc}: multi_slider has no "sliders" array in data.`);
+                }
+                break;
+            case 'image_selection':
+                if (!Array.isArray(data.images) || data.images.length === 0) {
+                    errors.push(`${loc}: image_selection has no "images" array in data.`);
+                }
+                break;
+            case 'ranking':
+                if (!Array.isArray(data.items) || data.items.length === 0) {
+                    errors.push(`${loc}: ranking has no "items" array in data.`);
+                }
+                break;
+            case 'image_grid_slider':
+                if (!Array.isArray(data.images) || data.images.length === 0) {
+                    errors.push(`${loc}: image_grid_slider has no "images" array in data.`);
+                }
+                break;
+            // consent, information_screen, height_weight, text — no strict data requirements
+        }
+    });
+
+    // 3. Section checks (warnings only)
+    const allIds = json.questions.map(q => (q.id || '').toLowerCase());
+    const allSections = json.questions.map(q => (q.section || '').toLowerCase());
+    const allTypes = json.questions.map(q => q.type || '');
+
+    if (!allTypes.includes('consent') && !allIds.some(id => id.includes('consent'))) {
+        warnings.push('No consent/screening question detected. Consider adding one.');
+    }
+    if (!allSections.some(s => s.includes('demograph')) && !allIds.some(id => ['gender', 'income', 'age', 'region'].some(k => id.includes(k)))) {
+        warnings.push('No demographics section detected.');
+    }
+    if (!allSections.some(s => s.includes('medication')) && !allIds.some(id => id.includes('med_'))) {
+        warnings.push('No medication history section detected.');
+    }
+
+    return { valid: errors.length === 0, errors, warnings };
+}
+
+function handleGLP1FileSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const json = JSON.parse(e.target.result);
+
+            // ── Run validation ──
+            const { valid, errors, warnings } = validateGLP1Json(json);
+
+            // Show errors / warnings
+            const warningsArea = document.getElementById('glp1WarningsArea');
+            const warningsList = document.getElementById('glp1WarningsList');
+
+            if (errors.length > 0 || warnings.length > 0) {
+                warningsArea.style.display = 'block';
+                let html = '';
+                if (errors.length > 0) {
+                    html += '<li style="color:#c0392b; font-weight:600;">Errors (must fix):</li>';
+                    html += errors.map(e => `<li style="color:#c0392b;">❌ ${escapeHTML(e)}</li>`).join('');
+                }
+                if (warnings.length > 0) {
+                    html += '<li style="color:#8a6d3b; font-weight:600; margin-top:6px;">Warnings:</li>';
+                    html += warnings.map(w => `<li>⚠️ ${escapeHTML(w)}</li>`).join('');
+                }
+                warningsList.innerHTML = html;
+            } else {
+                warningsArea.style.display = 'none';
+            }
+
+            if (!valid) {
+                showToast(`JSON has ${errors.length} error(s) — fix before uploading`, 'error');
+                // Show file info but keep button disabled
+                document.getElementById('glp1DropContent').style.display = 'none';
+                document.getElementById('glp1FileInfo').style.display = 'block';
+                document.getElementById('glp1FileName').textContent = file.name;
+                document.getElementById('glp1FileStats').textContent = `❌ ${errors.length} error(s) found`;
+                document.getElementById('glp1FileStats').style.color = '#c0392b';
+                document.getElementById('createGlp1Btn').disabled = true;
+                glp1UploadedJson = null;
+                return;
+            }
+
+            // Valid JSON — store and update UI
+            glp1UploadedJson = json;
+            
+            document.getElementById('glp1DropContent').style.display = 'none';
+            const fileInfo = document.getElementById('glp1FileInfo');
+            fileInfo.style.display = 'block';
+            document.getElementById('glp1FileName').textContent = file.name;
+            
+            const qCount = (json.questions || []).length;
+            const statsEl = document.getElementById('glp1FileStats');
+            statsEl.textContent = `✅ ${qCount} questions — valid`;
+            statsEl.style.color = '#27ae60';
+
+            // Detect Sections
+            const sections = new Set();
+            (json.questions || []).forEach(q => {
+                if (q.section) sections.add(q.section);
+            });
+            
+            const sectionsPreview = document.getElementById('glp1SectionsPreview');
+            const sectionsList = document.getElementById('glp1SectionsList');
+            if (sections.size > 0) {
+                sectionsPreview.style.display = 'block';
+                sectionsList.innerHTML = Array.from(sections)
+                    .map(s => `<div style="padding: 4px 0; border-bottom: 1px solid #eee;">• ${escapeHTML(s)}</div>`)
+                    .join('');
+            } else {
+                sectionsPreview.style.display = 'none';
+            }
+
+            document.getElementById('createGlp1Btn').disabled = false;
+        } catch (err) {
+            showToast('Invalid JSON file — could not parse', 'error');
+            clearGLP1File();
+        }
+    };
+    reader.readAsText(file);
+}
+
+function clearGLP1File() {
+    glp1UploadedJson = null;
+    const input = document.getElementById('glp1FileInput');
+    if (input) input.value = '';
+    
+    document.getElementById('glp1DropContent').style.display = 'block';
+    document.getElementById('glp1FileInfo').style.display = 'none';
+    const statsEl = document.getElementById('glp1FileStats');
+    if (statsEl) statsEl.style.color = '#666';
+    document.getElementById('glp1SectionsPreview').style.display = 'none';
+    document.getElementById('glp1WarningsArea').style.display = 'none';
+    document.getElementById('createGlp1Btn').disabled = true;
+}
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
+
+async function submitGLP1SurveyCreation() {
+    const titleInput = document.getElementById('glp1Title');
+    const pointsInput = document.getElementById('glp1Points');
+    const maxResponsesInput = document.getElementById('glp1MaxResponses');
+
+    const title = titleInput ? titleInput.value.trim() : 'GLP-1 Phase 1 Consumer Research Survey';
+    const points = parseInt(pointsInput ? pointsInput.value : '50') || 50;
+    const maxResponses = parseInt(maxResponsesInput ? maxResponsesInput.value : '500') || 500;
+
+    if (!title) {
+        showToast('Please enter a survey title', 'error');
+        return;
+    }
+
+    if (!glp1UploadedJson) {
+        showToast('Please upload a JSON file first', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('createGlp1Btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Creating Draft...';
+    }
+
+    try {
+        const payload = {
+            title,
+            points,
+            max_responses: maxResponses,
+            auto_publish: false,
+            survey_json: glp1UploadedJson,
+        };
+
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/surveys/create-glp1`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || 'Failed to create GLP-1 survey');
+        }
+
+        // Show server-side warnings if any
+        if (data.warnings && data.warnings.length > 0) {
+            const warningsArea = document.getElementById('glp1WarningsArea');
+            const warningsList = document.getElementById('glp1WarningsList');
+            warningsArea.style.display = 'block';
+            warningsList.innerHTML = data.warnings.map(w => `<li>⚠️ ${escapeHTML(w)}</li>`).join('');
+        }
+
+        showToast(`✅ GLP-1 survey created as DRAFT with ${data.questions_count} questions. Review and publish from the surveys list.`, 'success');
+        closeGLP1SurveyModal();
+        showSurveysList();
+
+    } catch (e) {
+        console.error('Error creating GLP-1 survey:', e);
+        showToast(e.message || 'Error creating GLP-1 survey', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '📄 Create as Draft';
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════
 // DASHBOARD
 // ═════════════════════════════════════════════════════════
 
@@ -1000,6 +1321,99 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 // ═════════════════════════════════════════════════════════
+// CUSTOM QUESTIONS UPLOAD HANDLERS
+// ═════════════════════════════════════════════════════════
+
+let uploadedCustomQuestionsPayload = null;
+
+function handleCustomQuestionsUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            let categories = [];
+            if (parsed.categories && Array.isArray(parsed.categories)) {
+                categories = parsed.categories;
+            } else if (Array.isArray(parsed)) {
+                categories = [{ name: "General Custom Questions", questions: parsed }];
+            } else if (parsed.questions && Array.isArray(parsed.questions)) {
+                categories = [{ name: "General Custom Questions", questions: parsed.questions }];
+            } else {
+                throw new Error('JSON format invalid. Expected { "categories": [ { "name": "...", "questions": [...] } ] }');
+            }
+
+            let totalQuestions = 0;
+            const validCategories = categories.map((cat, cIdx) => {
+                const catName = cat.name || `Category ${cIdx + 1}`;
+                const questions = (cat.questions || []).map((q, qIdx) => {
+                    if (!q.title || !q.type) {
+                        throw new Error(`Question ${qIdx + 1} in category "${catName}" missing title or type.`);
+                    }
+                    totalQuestions++;
+                    return {
+                        id: q.id || `cq_${cIdx + 1}_${qIdx + 1}`,
+                        type: q.type,
+                        title: q.title,
+                        description: q.description || null,
+                        required: q.required !== false,
+                        data: q.data || {}
+                    };
+                });
+                return { name: catName, questions };
+            });
+
+            if (totalQuestions === 0) {
+                throw new Error('JSON file contains no custom questions.');
+            }
+
+            uploadedCustomQuestionsPayload = { categories: validCategories };
+            document.getElementById('customQuestionsFileName').textContent = `${file.name} (${totalQuestions} question${totalQuestions > 1 ? 's' : ''})`;
+            document.getElementById('clearCustomQuestionsBtn').style.display = 'inline-block';
+            renderCustomQuestionsPreview(validCategories);
+            showToast(`Loaded ${totalQuestions} custom question(s) successfully!`, 'success');
+        } catch (err) {
+            clearCustomQuestionsUpload();
+            showToast(`Invalid custom questions file: ${err.message}`, 'error');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function clearCustomQuestionsUpload() {
+    uploadedCustomQuestionsPayload = null;
+    document.getElementById('customQuestionsFile').value = '';
+    document.getElementById('customQuestionsFileName').textContent = 'No file selected';
+    document.getElementById('clearCustomQuestionsBtn').style.display = 'none';
+    document.getElementById('customQuestionsPreview').style.display = 'none';
+    document.getElementById('customQuestionsCategoriesList').innerHTML = '';
+}
+
+function renderCustomQuestionsPreview(categories) {
+    const previewEl = document.getElementById('customQuestionsPreview');
+    const container = document.getElementById('customQuestionsCategoriesList');
+    container.innerHTML = '';
+
+    categories.forEach(cat => {
+        const catDiv = document.createElement('div');
+        catDiv.style.marginBottom = '8px';
+        catDiv.innerHTML = `
+            <div style="font-weight: 600; font-size: 13px; color: var(--color-accent, #6366f1); margin-bottom: 4px;">
+                📁 ${cat.name} (${cat.questions.length})
+            </div>
+            <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--color-text-secondary);">
+                ${cat.questions.map(q => `<li><strong>[${q.type}]</strong> ${q.title}</li>`).join('')}
+            </ul>
+        `;
+        container.appendChild(catDiv);
+    });
+
+    previewEl.style.display = 'block';
+}
+
+// ═════════════════════════════════════════════════════════
 // SURVEY GENERATION
 // ═════════════════════════════════════════════════════════
 
@@ -1013,6 +1427,7 @@ async function generateSurvey() {
     const surveyType = document.getElementById('surveyType').value;
     const isMultiConcept = document.querySelector('input[name="conceptType"]:checked').value === 'multi';
     const panelId = document.getElementById('surveyPanel').value || null;
+    const aiProvider = document.getElementById('aiProvider').value || null;
     const targetAttributes = getTargetAttributesFromForm();
 
     if (!name || !description || !context || !tenantId || !surveyType) {
@@ -1042,7 +1457,9 @@ async function generateSurvey() {
                 is_multi_concept: isMultiConcept,
                 concepts: getConceptsFromForm(),  // ss: send concepts with image URLs
                 panel_id: panelId,
-                target_attributes: targetAttributes
+                ai_provider: aiProvider,
+                target_attributes: targetAttributes,
+                custom_questions: uploadedCustomQuestionsPayload
             })
         });
 
@@ -1214,6 +1631,11 @@ function validateSurveyStructure(structure) {
                     warnings.push({ code: 'image_selection_missing_images', message: 'image_selection has no images array.', location: loc });
                 }
                 break;
+            case 'image_grid_slider':
+                if (!Array.isArray(data.images) || data.images.length === 0) {
+                    warnings.push({ code: 'image_grid_slider_missing_images', message: 'image_grid_slider has no images array.', location: loc });
+                }
+                break;
         }
     });
 
@@ -1366,6 +1788,18 @@ function displaySurveyResponse(data) {
     // Set questions count
     document.getElementById('questionsCountDisplay').textContent = data.questions_count;
 
+    // Display AI provider used (if available)
+    const providerInfo = data.ai_metadata?.provider || 'Unknown';
+    const providerBadge = document.createElement('div');
+    providerBadge.className = 'detail-item';
+    providerBadge.innerHTML = `<label>AI Provider Used:</label><span class="provider-badge">${providerInfo}</span>`;
+
+    // Insert provider info after questions count (find and insert after that element)
+    const questionsDetail = document.querySelector('.detail-item:has(+ .detail-item)');
+    if (questionsDetail) {
+        questionsDetail.insertAdjacentElement('afterend', providerBadge);
+    }
+
     // Display structure
     document.getElementById('structurePreview').textContent = JSON.stringify(data.structure, null, 2);
 
@@ -1386,8 +1820,9 @@ function displaySurveyResponse(data) {
         document.getElementById('warningsSection').style.display = 'none';
     }
 
-    // Show success message
-    successMessage.textContent = data.message;
+    // Show success message with provider info
+    const providerText = data.ai_metadata?.provider ? ` (Generated by: ${data.ai_metadata.provider})` : '';
+    successMessage.textContent = data.message + providerText;
     successMessage.style.display = 'block';
 
     // Show details
@@ -1403,6 +1838,7 @@ function resetForm() {
     document.getElementById('nameCount').textContent = '0/500';
     document.getElementById('descCount').textContent = '0/2000';
     document.getElementById('contextCount').textContent = '0/50000';
+    clearCustomQuestionsUpload();
 }
 
 function copySurveyId() {
@@ -2085,6 +2521,26 @@ function renderQuestionAnalyticsBlock(qa) {
     } else if (qa.question_type === 'text') {
         const responseCount = qa.analytics?.response_count || 0;
         html += `<div class="qa-text-note">📝 ${responseCount} open-ended response${responseCount !== 1 ? 's' : ''} (not displayed)</div>`;
+    } else if (qa.question_type === 'image_grid_slider' && qa.analytics?.images) {
+        html += `<div>`;
+        for (const [imgId, img] of Object.entries(qa.analytics.images)) {
+            const label = img.label || imgId;
+            const sliderMean = img.slider_mean || 0;
+            const barWidth = Math.min((sliderMean / 100) * 100, 100);
+            html += `<div class="qa-slider-row">
+                <span class="qa-row-label">${label}</span>
+                <div class="qa-row-bar-bg"><div class="qa-row-bar" style="width: ${barWidth}%"></div></div>
+                <span class="qa-row-value">${sliderMean.toFixed(1)}</span>
+            </div>`;
+            if (img.selected_count !== undefined) {
+                const percent = img.selected_percent || 0;
+                html += `<div class="qa-option-row" style="margin-left: 1rem; font-size: 0.85em; opacity: 0.8;">
+                    <span class="qa-row-label">Selected</span>
+                    <span class="qa-row-value">${percent.toFixed(1)}% (n=${img.selected_count})</span>
+                </div>`;
+            }
+        }
+        html += `</div>`;
     }
     return html;
 }

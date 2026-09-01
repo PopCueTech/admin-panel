@@ -753,6 +753,17 @@ body {
     font-weight: 500;
 }
 
+.provider-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #0c4a6e;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
 /* Client-side structure validation banner */
 .validation-banner {
     margin: 16px 0 20px;
@@ -2270,4 +2281,20 @@ body {
 }
 .pa-switch input:checked + .pa-switch-slider::before {
     transform: translateX(15px);
+}
+
+/* GLP1 Custom Upload Styles */
+.glp1-drop-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 32px 16px;
+    text-align: center;
+    background: #f9fafb;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 16px;
+}
+.glp1-drop-zone:hover, .glp1-drop-zone.dragover {
+    border-color: #6366f1;
+    background: #eef2ff;
 }
